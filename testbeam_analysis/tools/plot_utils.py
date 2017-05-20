@@ -44,7 +44,7 @@ def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=Non
     fig.colorbar(im, boundaries=bounds, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), fraction=0.04, pad=0.05)
 
 
-def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_pdf_file=None):
+def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_pdf_file=None, gui=False):
     with tb.open_file(input_mask_file, 'r') as input_file_h5:
         try:
             noisy_pixels = np.dstack(np.nonzero(input_file_h5.root.NoisyPixelMask[:].T))[0]
@@ -67,6 +67,34 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
 
     if dut_name is None:
         dut_name = os.path.split(input_mask_file)[1]
+
+    if gui:
+
+        cmap = cm.get_cmap('viridis')
+        cmap.set_bad('w')
+        c_max = np.percentile(occupancy, 99)
+
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        ax.set_title('%s' % (dut_name,))
+        # plot noisy pixels
+        if noisy_pixels is not None:
+            ax.plot(noisy_pixels[:, 1], noisy_pixels[:, 0], 'ro', mfc='none', mec='c', ms=10)
+            ax.set_title(ax.get_title() + ',\n%d noisy pixels' % (n_noisy_pixels,))
+        # plot disabled pixels
+        if disabled_pixels is not None:
+            ax.plot(disabled_pixels[:, 1], disabled_pixels[:, 0], 'ro', mfc='none', mec='r', ms=10)
+            ax.set_title(ax.get_title() + ',\n%d disabled pixels' % (n_disabled_pixels,))
+        ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, interpolation='none', origin='lower',
+                  clim=(0, c_max))
+        ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
+        ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
+        ax.set_xlabel("Column")
+        ax.set_ylabel("Row")
+
+        return fig
+
 
     if output_pdf_file is None:
         output_pdf_file = os.path.splitext(input_mask_file)[0] + '_masked_pixels.pdf'
@@ -108,22 +136,85 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
         output_pdf.savefig(fig)
 
 
-def plot_cluster_size(hight, n_hits, n_clusters, max_cluster_size, dut_name, output_pdf_file):
+def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, chunk_size=1000000, gui=False):
     '''Plotting cluster size histogram.
 
     Parameters
     ----------
-    hight : array like
-        Histogram entries
-    n_hits : number
-        Total number of hits
-    n_clusters : number
-        Total number of cluster
-    max_cluster_size : number
-        Maximum cluster size
+    input_cluster_file : string
+        Filename of the input cluster file.
+    dut_name : string
+        Name of the DUT. If None, the filename of the input cluster file will be used.
+    output_pdf_file : string
+        Filename of the output PDF file. If None, the filename is derived from the input file.
+    chunk_size : int
+        Chunk size of the data when reading from file.
     '''
+    if not dut_name:
+        dut_name = os.path.split(input_cluster_file)[1]
+
+    if gui:
+
+        with tb.open_file(input_cluster_file, 'r') as input_file_h5:
+            hight = None
+            n_hits = 0
+            n_clusters = input_file_h5.root.Cluster.nrows
+            for start_index in range(0, n_clusters, chunk_size):
+                cluster_n_hits = input_file_h5.root.Cluster[start_index:start_index + chunk_size]['n_hits']
+                # calculate cluster size histogram
+                if hight is None:
+                    max_cluster_size = np.amax(cluster_n_hits)
+                    hight = testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                elif max_cluster_size < np.amax(cluster_n_hits):
+                    max_cluster_size = np.amax(cluster_n_hits)
+                    hight.resize(max_cluster_size + 1)
+                    hight += testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                else:
+                    hight += testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                n_hits += np.sum(cluster_n_hits)
+
+        left = np.arange(max_cluster_size + 1)
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        ax.bar(left, hight, align='center')
+        ax.set_title('Cluster size of %s\n(%i hits in %i clusters)' % (dut_name, n_hits, n_clusters))
+        ax.set_xlabel('Cluster size')
+        ax.set_ylabel('#')
+        ax.grid()
+        ax.set_yscale('log')
+        ax.set_xlim(xmin=0.5)
+        ax.set_ylim(ymin=1e-1)
+        #output_pdf.savefig(fig)
+        ax.set_yscale('linear')
+        ax.set_ylim(ymax=np.amax(hight))
+        ax.set_xlim(0.5, min(10, max_cluster_size) + 0.5)
+
+        return fig
+
+
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(input_cluster_file)[0] + '_cluster_size.pdf'
 
     with PdfPages(output_pdf_file) as output_pdf:
+        with tb.open_file(input_cluster_file, 'r') as input_file_h5:
+            hight = None
+            n_hits = 0
+            n_clusters = input_file_h5.root.Cluster.nrows
+            for start_index in range(0, n_clusters, chunk_size):
+                cluster_n_hits = input_file_h5.root.Cluster[start_index:start_index + chunk_size]['n_hits']
+                # calculate cluster size histogram
+                if hight is None:
+                    max_cluster_size = np.amax(cluster_n_hits)
+                    hight = testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                elif max_cluster_size < np.amax(cluster_n_hits):
+                    max_cluster_size = np.amax(cluster_n_hits)
+                    hight.resize(max_cluster_size + 1)
+                    hight += testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                else:
+                    hight += testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                n_hits += np.sum(cluster_n_hits)
+
         left = np.arange(max_cluster_size + 1)
         fig = Figure()
         _ = FigureCanvas(fig)
@@ -481,6 +572,7 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
     if non_interactive:
         update_auto(None)
     else:
+        plt.get_current_fig_manager().window.showMaximized()  # Plot needs to be large, so maximize
         plt.show()
 
     return selected_data, fit, do_refit  # Return cut data for further processing
@@ -563,7 +655,7 @@ def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pi
     output_pdf.savefig(fig)
 
 
-def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=None, dut_names=None):
+def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=None, dut_names=None, gui=False):
     '''Takes the correlation histograms and plots them.
 
     Parameters
@@ -573,6 +665,46 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
     output_pdf_file : string
         Filename of the output PDF file. If None, the filename is derived from the input file.
     '''
+
+    if gui:
+        with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
+            fig = Figure()
+            _ = FigureCanvas(fig)
+            for node in in_file_h5.root:
+                try:
+                    indices = re.findall(r'\d+', node.name)
+                    dut_idx = int(indices[0])
+                    ref_idx = int(indices[1])
+                    if "column" in node.name.lower():
+                        column = True
+                    else:
+                        column = False
+                except AttributeError:
+                    continue
+                data = node[:]
+
+                if np.all(data <= 0):
+                    logging.warning('All correlation entries for %s are zero, do not create plots', str(node.name))
+                    continue
+
+                ax = fig.add_subplot(111)
+                cmap = cm.get_cmap('viridis')
+                cmap.set_bad('w')
+                norm = colors.LogNorm()
+                if pixel_size:
+                    aspect = pixel_size[ref_idx][0 if column else 1] / (pixel_size[dut_idx][0 if column else 1])
+                else:
+                    aspect = "auto"
+                im = ax.imshow(data.T, origin="lower", cmap=cmap, norm=norm, aspect=aspect, interpolation='none')
+                dut_name = dut_names[dut_idx] if dut_names else ("DUT " + str(dut_idx))
+                ref_name = dut_names[ref_idx] if dut_names else ("DUT " + str(ref_idx))
+                ax.set_title("Correlation of %s: %s vs. %s" % ("columns" if "column" in node.title.lower() else "rows", ref_name, dut_name))
+                ax.set_xlabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", dut_name))
+                ax.set_ylabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", ref_name))
+                # do not append to axis to preserve aspect ratio
+                fig.colorbar(im, cmap=cmap, norm=norm, fraction=0.04, pad=0.05)
+            return fig
+
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_correlation_file)[0] + '_correlation.pdf'
 
@@ -611,45 +743,6 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 ax.set_title("Correlation of %s: %s vs. %s" % ("columns" if "column" in node.title.lower() else "rows", ref_name, dut_name))
                 ax.set_xlabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", dut_name))
                 ax.set_ylabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", ref_name))
-                # do not append to axis to preserve aspect ratio
-                fig.colorbar(im, cmap=cmap, norm=norm, fraction=0.04, pad=0.05)
-                output_pdf.savefig(fig)
-
-
-def plot_checks(input_corr_file, output_pdf_file=None):
-    '''Takes the hit check histograms and plots them.
-
-    Parameters
-    ----------
-    input_corr_file : string
-        Filename of the input correlation file.
-    output_pdf_file : string
-        Filename of the output PDF file. If None, the filename is derived from
-        the input file.
-    '''
-    if not output_pdf_file:
-        output_pdf_file = os.path.splitext(input_corr_file)[0] + '.pdf'
-
-    with PdfPages(output_pdf_file) as output_pdf:
-        with tb.open_file(input_corr_file, mode="r") as in_file_h5:
-            for node in in_file_h5.root:
-                data = node[:]
-
-                if np.all(data <= 0):
-                    logging.warning('All correlation entries for %s are zero, do not create plots', str(node.name))
-                    continue
-
-                fig = Figure()
-                _ = FigureCanvas(fig)
-                ax = fig.add_subplot(111)
-                cmap = cm.get_cmap('viridis')
-                cmap.set_bad('w')
-                norm = colors.LogNorm()
-                if len(data.shape) == 1:  # 1 d data (event delta)
-                    ax.plot(data, '-')
-                if len(data.shape) == 2:  # 2 d data (correlation)
-                    im = ax.imshow(data.T, origin="lower", cmap=cmap, norm=norm, aspect="auto", interpolation='none')
-                ax.set_title("%s" % node.title)
                 # do not append to axis to preserve aspect ratio
                 fig.colorbar(im, cmap=cmap, norm=norm, fraction=0.04, pad=0.05)
                 output_pdf.savefig(fig)
@@ -746,8 +839,7 @@ def plot_track_chi2(chi2s, fit_dut, output_pdf=None):
         ax.grid()
         ax.set_xlabel('Track Chi2 [um*um]')
         ax.set_ylabel('#')
-        if np.any(chi2s):  # Avoid crash for all values == 0 and log plot
-            ax.set_yscale('log')
+        ax.set_yscale('log')
         ax.set_title('Track Chi2 for DUT%d tracks' % fit_dut)
         output_pdf.savefig(fig)
 
@@ -770,7 +862,7 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_pdf
         ax.set_ylabel('#')
 
         if plot_log:
-            ax.set_ylim(0.1, int(ceil(np.amax(histogram) / 10.0)) * 100)
+            ax.set_ylim(1, int(ceil(np.amax(histogram) / 10.0)) * 100)
 
         ax.bar(x, histogram, log=plot_log, align='center')
         if np.any(fit):
@@ -1071,57 +1163,6 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         logging.warning('Cannot create efficiency plots, all pixels are masked')
 
 
-def purity_plots(pure_hit_hist, hit_hist, purity, actual_dut, minimum_hit_density, plot_range, cut_distance, mask_zero=True, output_pdf=None):
-    # get number of entries for every histogram
-    n_pure_hit_hist = np.count_nonzero(pure_hit_hist)
-    n_hits_hit_density = np.sum(hit_hist)
-    n_hits_purity = np.count_nonzero(purity)
-
-    # for better readability allow masking of entries that are zero
-    if mask_zero:
-        pure_hit_hist = np.ma.array(pure_hit_hist, mask=(pure_hit_hist == 0))
-        hit_hist = np.ma.array(hit_hist, mask=hit_hist == 0)
-
-    fig = Figure()
-    _ = FigureCanvas(fig)
-    ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, pure_hit_hist.T, plot_range, title='Pure hit density for DUT %d (%d Pure Hits)' % (actual_dut, n_pure_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
-    fig.tight_layout()
-    output_pdf.savefig(fig)
-
-    fig = Figure()
-    _ = FigureCanvas(fig)
-    ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_hit_density), x_axis_title="column [um]", y_axis_title="row [um]")
-    fig.tight_layout()
-    output_pdf.savefig(fig)
-
-    if np.any(~purity.mask):
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-        z_min = np.ma.min(purity)
-        if z_min == 100.:  # One cannot plot with 0 z axis range
-            z_min = 90.
-        plot_2d_pixel_hist(fig, ax, purity.T, plot_range, title='Purity for DUT %d (%d Entries)' % (actual_dut, n_hits_purity), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
-        fig.tight_layout()
-        output_pdf.savefig(fig)
-
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-        ax.grid()
-        ax.set_title('Purity per pixel for DUT %d: %1.4f +- %1.4f' % (actual_dut, np.ma.mean(purity), np.ma.std(purity)))
-        ax.set_xlabel('Purity [%]')
-        ax.set_ylabel('#')
-        ax.set_yscale('log')
-        ax.set_xlim([-0.5, 101.5])
-        ax.hist(purity.ravel()[purity.ravel().mask != 1], bins=101, range=(0, 100))  # Histogram not masked pixel purity
-        output_pdf.savefig(fig)
-    else:
-        logging.warning('Cannot create purity plots, since all pixels are masked')
-
-
 def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=None):
     ''' Plot track slopes.
 
@@ -1142,14 +1183,11 @@ def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=Non
     with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_track_angle_file, mode="r") as in_file_h5:
             for node in in_file_h5.root:
-                if 'DUT' in node.name:
-                    actual_dut = int(re.findall(r'\d+', node.name)[-1])
-                    if dut_names is not None:
-                        dut_name = dut_names[actual_dut]
-                    else:
-                        dut_name = "DUT%d" % actual_dut
+                actual_dut = int(re.findall(r'\d+', node.name)[-1])
+                if dut_names is not None:
+                    dut_name = dut_names[actual_dut]
                 else:
-                    dut_name = None
+                    dut_name = "DUT%d" % actual_dut
                 track_angle_hist = node[:]
                 edges = node._v_attrs.edges * 1000  # conversion to mrad
                 mean = node._v_attrs.mean * 1000  # conversion to mrad
@@ -1159,19 +1197,15 @@ def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=Non
                 fig = Figure()
                 _ = FigureCanvas(fig)
                 ax = fig.add_subplot(111)
-                # fixing bin width in plotting
-                width = (edges[1:] - edges[:-1])
-                ax.bar(bin_center, track_angle_hist, label='Angular Distribution%s' % ((" for %s" % dut_name) if dut_name else ""), width=width, color='b', align='center')
-                x_gauss = np.arange(np.min(edges), np.max(edges), step=0.0001)
+                ax.bar(bin_center, track_angle_hist, label=('Angular Distribution for %s' % dut_name), width=(edges[0]-edges[-1])/len(edges), color='b', align='center')
+                x_gauss = np.arange(np.min(edges), np.max(edges), step=0.00001)
                 ax.plot(x_gauss, testbeam_analysis.tools.analysis_utils.gauss(x_gauss, amp, mean, sigma), color='r', label='Gauss-Fit:\nMean: %.5f mrad,\nSigma: %.5f mrad' % (mean, sigma))
                 ax.set_ylabel('#')
-                if 'Alpha' in node.name:
-                    angle = "alpha"
-                elif 'Beta' in node.name:
-                    angle = "beta"
+                if 'x' in node.name:
+                    direction = "X"
                 else:
-                    angle = "total"
-                ax.set_title('%s angular distribution of fitted tracks%s' % (angle.title(), (" for %s" % dut_name) if dut_name else ""))
+                    direction = "Y"
+                ax.set_title('Angular distribution of fitted tracks for %s in %s-direction (beta)' % (dut_name, direction))
                 ax.set_xlabel('Track angle [mrad]')
                 ax.legend(loc=1, fancybox=True, frameon=True)
                 ax.grid()
