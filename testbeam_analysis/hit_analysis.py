@@ -367,9 +367,9 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
                 input_mask_file_h5.root.NoisyPixelMask._f_copy(newparent=output_file_h5.root)
 
     if plot:
-        plot_cluster_size(hight, n_hits, n_clusters, max_cluster_size,
-                          dut_name=os.path.split(output_cluster_file)[1],
-                          output_pdf_file=os.path.splitext(output_cluster_file)[0] + '_cluster_size.pdf')
+        plot_cluster_size(output_cluster_file, dut_name=os.path.split(output_cluster_file)[1],
+                          output_pdf_file=os.path.splitext(output_cluster_file)[0] + '_cluster_size.pdf',
+                          chunk_size=chunk_size, gui=False)
 
     return output_cluster_file
 
