@@ -1,7 +1,7 @@
 ''' Script to check the correctness of the analysis. The analysis is done on raw data and all results are compared to a recorded analysis.
 '''
 import os
-
+import shutil
 import unittest
 
 import numpy as np
@@ -10,10 +10,6 @@ from testbeam_analysis import dut_alignment
 from testbeam_analysis.tools import test_tools
 from testbeam_analysis.tools import geometry_utils
 from testbeam_analysis.tools import analysis_utils
-
-test_tools.install_quilt_data(package='DavidLP/tba_fixtures',
-                              hash='ecc02538576cb905044222270674ef57e21e44c67d6bab36d4c0eb6ce08f4e66')
-from quilt.data.DavidLP import tba_fixtures
 
 
 class TestAlignmentAnalysis(unittest.TestCase):
@@ -25,24 +21,15 @@ class TestAlignmentAnalysis(unittest.TestCase):
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
 
-        cls.data_files = [test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Cluster_DUT%d_cluster' % i) for i in range(4)]
-        cls.output_folder = ''
+        cls.data_files = [analysis_utils.get_data(r'fixtures/dut_alignment/Cluster_DUT%d_cluster.h5' % i) for i in range(4)]
+        cls.output_folder = os.path.dirname(os.path.realpath(cls.data_files[0]))
         cls.n_pixels = [(80, 336)] * 4
         cls.pixel_size = [(250, 50)] * 4  # in um
         cls.z_positions = [0., 19500, 108800, 128300]
 
     @classmethod
     def tearDownClass(cls):  # remove created files
-        os.remove(os.path.join(cls.output_folder, 'Correlation.h5'))
-        os.remove(os.path.join(cls.output_folder, 'Correlation_correlation.pdf'))
-        os.remove(os.path.join(cls.output_folder, 'Correlation_2.h5'))
-        os.remove(os.path.join(cls.output_folder, 'Correlation_2_correlation.pdf'))
-        os.remove(os.path.join(cls.output_folder, 'Merged.h5'))
-        os.remove(os.path.join(cls.output_folder, 'Merged_2.h5'))
-        os.remove(os.path.join(cls.output_folder, 'Tracklets.h5'))
-        os.remove(os.path.join(cls.output_folder, 'Tracklets_2.h5'))
-#         os.remove(os.path.join(cls.output_folder, 'Alignment_difficult.h5'))
-#         os.remove(os.path.join(cls.output_folder, 'Prealignment.pdf'))
+        shutil.rmtree(cls.output_folder)
 
     def test_cluster_correlation(self):  # Check the cluster correlation function
         dut_alignment.correlate_cluster(input_cluster_files=self.data_files,
@@ -50,7 +37,8 @@ class TestAlignmentAnalysis(unittest.TestCase):
                                         n_pixels=self.n_pixels,
                                         pixel_size=self.pixel_size
                                         )
-        data_equal, error_msg = test_tools.compare_h5_files(test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Correlation_result'), os.path.join(self.output_folder, 'Correlation.h5'), exact=True)
+        data_equal, error_msg = test_tools.compare_h5_files(analysis_utils.get_data(r'fixtures/dut_alignment/Correlation_result.h5'),
+                                                            os.path.join(self.output_folder, 'Correlation.h5'), exact=True)
         self.assertTrue(data_equal, msg=error_msg)
 
         # Retest with tiny chunk size to force chunked correlation
@@ -60,13 +48,14 @@ class TestAlignmentAnalysis(unittest.TestCase):
                                         pixel_size=self.pixel_size,
                                         chunk_size=293
                                         )
-        data_equal, error_msg = test_tools.compare_h5_files(test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Correlation_result'), os.path.join(self.output_folder, 'Correlation_2.h5'), exact=True)
+        data_equal, error_msg = test_tools.compare_h5_files(analysis_utils.get_data(r'fixtures/dut_alignment/Correlation_result.h5'),
+                                                            os.path.join(self.output_folder, 'Correlation_2.h5'), exact=True)
         self.assertTrue(data_equal, msg=error_msg)
 
     # FIXME: fails under Linux, needs check why
     @unittest.SkipTest
     def test_prealignment(self):  # Check the hit alignment function
-        dut_alignment.prealignment(input_correlation_file=test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Correlation_result'),
+        dut_alignment.prealignment(input_correlation_file=analysis_utils.get_data(r'fixtures/dut_alignment/Correlation_result.h5'),
                                    output_alignment_file=os.path.join(self.output_folder, 'Alignment.h5'),
                                    z_positions=self.z_positions,
                                    pixel_size=self.pixel_size,
@@ -75,21 +64,21 @@ class TestAlignmentAnalysis(unittest.TestCase):
                                    iterations=3)  # Due to too little test data the alignment result is only rather stable for more iterations
 
         # FIXME: residuals should be checked not prealingment data
-        data_equal, error_msg = test_tools.compare_h5_files(test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Prealignment_result'),
+        data_equal, error_msg = test_tools.compare_h5_files(analysis_utils.get_data(r'fixtures/dut_alignment/Prealignment_result.h5'),
                                                             os.path.join(self.output_folder, 'Alignment.h5'),
                                                             exact=False,
                                                             rtol=0.05,  # 5 % error allowed
                                                             atol=5)  # 5 um absolute tolerance allowed
         self.assertTrue(data_equal, msg=error_msg)
 
-        dut_alignment.prealignment(input_correlation_file=test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Correlation_difficult'),
+        dut_alignment.prealignment(input_correlation_file=analysis_utils.get_data(r'fixtures/dut_alignment/Correlation_difficult.h5'),
                                    output_alignment_file=os.path.join(self.output_folder, 'Alignment_difficult.h5'),
                                    z_positions=self.z_positions,
                                    pixel_size=self.pixel_size,
                                    non_interactive=True,
                                    fit_background=True,
                                    iterations=2)  # Due to too little test data the alignment result is only rather stable for more iterations
-        data_equal, error_msg = test_tools.compare_h5_files(test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Alignment_difficult_result'),
+        data_equal, error_msg = test_tools.compare_h5_files(analysis_utils.get_data(r'fixtures/dut_alignment/Alignment_difficult_result.h5'),
                                                             os.path.join(self.output_folder, 'Alignment_difficult.h5'),
                                                             exact=False,
                                                             rtol=0.05,  # 5 % error allowed
@@ -97,12 +86,12 @@ class TestAlignmentAnalysis(unittest.TestCase):
         self.assertTrue(data_equal, msg=error_msg)
 
     def test_cluster_merging(self):
-        cluster_files = [test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Cluster_DUT%d_cluster' % i) for i in range(4)]
+        cluster_files = [analysis_utils.get_data(r'fixtures/dut_alignment/Cluster_DUT%d_cluster.h5' % i) for i in range(4)]
         dut_alignment.merge_cluster_data(cluster_files,
                                          output_merged_file=os.path.join(self.output_folder, 'Merged.h5'),
                                          n_pixels=self.n_pixels,
                                          pixel_size=self.pixel_size)
-        data_equal, error_msg = test_tools.compare_h5_files(test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Merged_result'), os.path.join(self.output_folder, 'Merged.h5'))
+        data_equal, error_msg = test_tools.compare_h5_files(analysis_utils.get_data(r'fixtures/dut_alignment/Merged_result.h5'), os.path.join(self.output_folder, 'Merged.h5'))
         self.assertTrue(data_equal, msg=error_msg)
 
         # Retest with tiny chunk size to force chunked merging
@@ -112,37 +101,37 @@ class TestAlignmentAnalysis(unittest.TestCase):
                                          n_pixels=self.n_pixels,
                                          chunk_size=293)
 
-        data_equal, error_msg = test_tools.compare_h5_files(test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Merged_result'), os.path.join(self.output_folder, 'Merged_2.h5'))
+        data_equal, error_msg = test_tools.compare_h5_files(analysis_utils.get_data(r'fixtures/dut_alignment/Merged_result.h5'), os.path.join(self.output_folder, 'Merged_2.h5'))
         self.assertTrue(data_equal, msg=error_msg)
 
     def test_apply_alignment(self):
-        dut_alignment.apply_alignment(input_hit_file=test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Merged_result'),
-                                      input_alignment_file=test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Prealignment_result'),
+        dut_alignment.apply_alignment(input_hit_file=analysis_utils.get_data(r'fixtures/dut_alignment/Merged_result.h5'),
+                                      input_alignment_file=analysis_utils.get_data(r'fixtures/dut_alignment/Prealignment_result.h5'),
                                       output_hit_file=os.path.join(self.output_folder, 'Tracklets.h5'),
                                       force_prealignment=True)
-        data_equal, error_msg = test_tools.compare_h5_files(test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Tracklets_result'), os.path.join(self.output_folder, 'Tracklets.h5'))
+        data_equal, error_msg = test_tools.compare_h5_files(analysis_utils.get_data(r'fixtures/dut_alignment/Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets.h5'))
         self.assertTrue(data_equal, msg=error_msg)
 
         # Retest with tiny chunk size to force chunked alignment apply
-        dut_alignment.apply_alignment(input_hit_file=test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Merged_result'),
-                                      input_alignment_file=test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Prealignment_result'),
+        dut_alignment.apply_alignment(input_hit_file=analysis_utils.get_data(r'fixtures/dut_alignment/Merged_result.h5'),
+                                      input_alignment_file=analysis_utils.get_data(r'fixtures/dut_alignment/Prealignment_result.h5'),
                                       output_hit_file=os.path.join(self.output_folder, 'Tracklets_2.h5'),
                                       force_prealignment=True,
                                       chunk_size=293)
-        data_equal, error_msg = test_tools.compare_h5_files(test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Tracklets_result'), os.path.join(self.output_folder, 'Tracklets_2.h5'))
+        data_equal, error_msg = test_tools.compare_h5_files(analysis_utils.get_data(r'fixtures/dut_alignment/Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets_2.h5'))
         self.assertTrue(data_equal, msg=error_msg)
 
     @unittest.SkipTest
     def test_alignment(self):
-        dut_alignment.alignment(input_track_candidates_file=test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'TrackCandidates_prealigned'),
-                                input_alignment_file=test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Alignment'),
+        dut_alignment.alignment(input_track_candidates_file=analysis_utils.get_data(r'fixtures/dut_alignment/TrackCandidates_prealigned.h5'),
+                                input_alignment_file=analysis_utils.get_data(r'fixtures/dut_alignment/Alignment.h5'),
                                 n_pixels=[(1152, 576)] * 6,
                                 pixel_size=[(18.4, 18.4)] * 6)
 
         # FIXME: test should check residuals not alignment resulds
         # FIXME: translation error can be in the order of um, angle error not
-        data_equal, error_msg = test_tools.compare_h5_files(test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Alignment'),
-                                                            test_tools.get_quilt_data(tba_fixtures.dut_alignment, 'Alignment_result'),
+        data_equal, error_msg = test_tools.compare_h5_files(analysis_utils.get_data(r'fixtures/dut_alignment/Alignment.h5'),
+                                                            analysis_utils.get_data(r'fixtures/dut_alignment/Alignment_result.h5'),
                                                             exact=False,
                                                             rtol=0.01,  # 1 % error allowed
                                                             atol=5)  # 0.0001 absolute tolerance allowed
