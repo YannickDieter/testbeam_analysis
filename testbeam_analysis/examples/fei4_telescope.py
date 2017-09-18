@@ -20,18 +20,12 @@ from testbeam_analysis import hit_analysis
 from testbeam_analysis import dut_alignment
 from testbeam_analysis import track_analysis
 from testbeam_analysis import result_analysis
-from testbeam_analysis.tools import plot_utils
+from testbeam_analysis.tools import plot_utils, analysis_utils
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
 
-def run_analysis():
-    # Get the absolute path of example data
-    tests_data_folder = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), 'data')
-
-    # The location of the data files, one file per DUT
-    data_files = [(os.path.join(tests_data_folder, 'TestBeamData_FEI4_DUT%d.h5' % i)) for i in [0, 1, 4, 5]]  # The first device is the reference for the coordinate system
-
+def run_analysis(data_files):
     # Dimensions
     pixel_size = [(250, 50)] * 4  # in um
     n_pixels = [(80, 336)] * 4
@@ -138,5 +132,13 @@ def run_analysis():
                                          n_pixels=n_pixels,
                                          force_prealignment=True)
 
+
 if __name__ == '__main__':  # Main entry point is needed for multiprocessing under windows
-    run_analysis()
+    # Get the absolute path of example data
+    tests_data_folder = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), 'data')
+    # The location of the data files, one file per DUT
+    data_files = [analysis_utils.get_data(path='examples/TestBeamData_FEI4_DUT%d.h5' % i,
+                                          output=os.path.join(tests_data_folder,
+                                                                   'TestBeamData_FEI4_DUT%d.h5' % i)) for i in [0, 1, 4, 5]]  # The first device is the reference for the coordinate system
+
+    run_analysis(data_files)
