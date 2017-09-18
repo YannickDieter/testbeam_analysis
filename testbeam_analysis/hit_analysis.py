@@ -10,8 +10,115 @@ import numpy as np
 from scipy.ndimage import median_filter
 
 from pixel_clusterizer.clusterizer import HitClusterizer
-from testbeam_analysis.tools import analysis_utils
+from testbeam_analysis.tools import analysis_utils, plot_utils
 from testbeam_analysis.tools.plot_utils import plot_masked_pixels, plot_cluster_size
+
+
+def check_file(input_hits_file, n_pixel, output_check_file=None,
+               event_range=1, plot=True, chunk_size=1000000):
+    '''Checks the hit table to have proper data.
+
+    The checks include:
+      - hit definitions:
+          - position has to start at 1 (not 0)
+          - position should not exceed number of pixels (n_pixel)
+      - event building
+          - event number has to be strictly monotone
+          - hit position correlations of consecutive events are
+            created. Should be zero for distinctly
+            built events.
+
+    Parameters
+    ----------
+    input_hits_file : string
+        File name of the hit table.
+    output_check_file : string
+        Filename of the output file with the correlation histograms.
+    n_pixel : tuple
+        Tuple of the total number of pixels (column/row).
+    event_range : integer
+        The range of events to correlate.
+        E.g.: event_range = 2 correlates to predecessing event hits.
+    chunk_size : int
+        Chunk size of the data when reading from file.
+    '''
+
+    logging.info('=== Check data of hit file %s ===', input_hits_file)
+
+    if output_check_file is None:
+        output_check_file = input_hits_file[:-3] + '_check.h5'
+
+    with tb.open_file(output_check_file, mode="w") as out_file_h5:
+        with tb.open_file(input_hits_file, 'r') as input_file_h5:
+            shape_column = (n_pixel[0], n_pixel[0])
+            shape_row = (n_pixel[1], n_pixel[1])
+            col_corr = np.zeros(shape_column, dtype=np.int)
+            row_corr = np.zeros(shape_row, dtype=np.int)
+            last_event = None
+            out_dE = out_file_h5.create_earray(out_file_h5.root, name='EventDelta',
+                                               title='Change of event number per non empty event',
+                                               shape=(0, ),
+                                               atom=tb.Atom.from_dtype(np.dtype(np.uint64)),
+                                               filters=tb.Filters(complib='blosc',
+                                                                  complevel=5,
+                                                                  fletcher32=False))
+            out_E = out_file_h5.create_earray(out_file_h5.root, name='EventNumber',
+                                              title='Event number of non empty event',
+                                              shape=(0, ),
+                                              atom=tb.Atom.from_dtype(np.dtype(np.uint64)),
+                                              filters=tb.Filters(complib='blosc',
+                                                                 complevel=5,
+                                                                 fletcher32=False))
+
+            for hits, _ in analysis_utils.data_aligned_at_events(
+                    input_file_h5.root.Hits,
+                    chunk_size=chunk_size):
+                if not np.all(np.diff(hits['event_number']) >= 0):
+                    raise RuntimeError('The event number does not always increase. \
+                    The hits cannot be used like this!')
+                if np.any(hits['column'] < 1) or np.any(hits['row'] < 1):
+                    raise RuntimeError('The column/row definition does not \
+                    start at 1!')
+                if (np.any(hits['column'] > n_pixel[0])
+                        or np.any(hits['row'] > n_pixel[1])):
+                    raise RuntimeError('The column/row definition exceed the nuber \
+                    of pixels (%s/%s)!', n_pixel[0], n_pixel[1])
+
+                analysis_utils.correlate_hits_on_event_range(hits,
+                                                             col_corr,
+                                                             row_corr,
+                                                             event_range)
+
+                event_numbers = np.unique(hits['event_number'])
+                event_delta = np.diff(event_numbers)
+
+                if last_event:
+                    event_delta = np.concatenate((np.array([event_numbers[0] - last_event]),
+                                                  event_delta))
+                last_event = event_numbers[-1]
+
+                out_dE.append(event_delta)
+                out_E.append(event_numbers)
+
+            out_col = out_file_h5.create_carray(out_file_h5.root, name='CorrelationColumns',
+                                                title='Column Correlation with event range=%s' % event_range,
+                                                atom=tb.Atom.from_dtype(col_corr.dtype),
+                                                shape=col_corr.shape,
+                                                filters=tb.Filters(complib='blosc',
+                                                                   complevel=5,
+                                                                   fletcher32=False))
+            out_row = out_file_h5.create_carray(out_file_h5.root, name='CorrelationRows',
+                                                title='Row Correlation with event range=%s' % event_range,
+                                                atom=tb.Atom.from_dtype(row_corr.dtype),
+                                                shape=row_corr.shape,
+                                                filters=tb.Filters(complib='blosc',
+                                                                   complevel=5,
+                                                                   fletcher32=False))
+            out_col[:] = col_corr
+            out_row[:] = row_corr
+
+    if plot:
+        plot_utils.plot_checks(input_corr_file=output_check_file)
 
 
 def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMask", output_mask_file=None, pixel_size=None, threshold=10.0, filter_size=3, dut_name=None, plot=True, chunk_size=1000000):
