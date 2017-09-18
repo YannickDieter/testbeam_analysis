@@ -127,6 +127,43 @@ def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr
                 break
 
 
+@njit
+def correlate_hits_on_event_range(hits, column_corr_hist, row_corr_hist,
+                                  event_range):
+    """Correlating the hit indices of different events in a certain range.
+    For unambiguous event building no correlation should be seen.
+
+
+    Parameters
+    ----------
+    hits: np.recarray
+        Hit array. Must have event_number / column / row columns.
+    column_corr_hist, row_corr_hist: np.array
+        2D correlation array containing the correlation data. Has to be of
+        sufficient size.
+    event_range : integer
+        The number of events to use for correlation
+        E.g.: event_range = 2 correlates to predecessing event hits.
+    """
+    index_2 = 0
+
+    # Loop over hits, outer loop
+    for index in range(hits.shape[0]):
+
+        hit = hits[index]
+        event = hit['event_number']
+
+        # Max event of inner loop
+        max_event = event - event_range
+
+        # Catch up with outer loop
+        while index_2 < index and hits[index_2]['event_number'] <= max_event:
+            other_hit = hits[index_2]
+            column_corr_hist[other_hit['column'] - 1, hit['column'] - 1] += 1
+            row_corr_hist[other_hit['row'] - 1, hit['row'] - 1] += 1
+            index_2 += 1
+
+
 def in1d_events(ar1, ar2):
     """
     Does the same than np.in1d but uses the fact that ar1 and ar2 are sorted and the c++ library. Is therefore much much faster.
