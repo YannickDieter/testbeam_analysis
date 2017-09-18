@@ -174,8 +174,115 @@
 <span class="kn">from</span> <span class="nn">scipy.ndimage</span> <span class="k">import</span> <span class="n">median_filter</span>
 
 <span class="kn">from</span> <span class="nn">pixel_clusterizer.clusterizer</span> <span class="k">import</span> <span class="n">HitClusterizer</span>
-<span class="kn">from</span> <span class="nn">testbeam_analysis.tools</span> <span class="k">import</span> <span class="n">analysis_utils</span>
+<span class="kn">from</span> <span class="nn">testbeam_analysis.tools</span> <span class="k">import</span> <span class="n">analysis_utils</span><span class="p">,</span> <span class="n">plot_utils</span>
 <span class="kn">from</span> <span class="nn">testbeam_analysis.tools.plot_utils</span> <span class="k">import</span> <span class="n">plot_masked_pixels</span><span class="p">,</span> <span class="n">plot_cluster_size</span>
+
+
+<span class="k">def</span> <span class="nf">check_file</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">,</span> <span class="n">n_pixel</span><span class="p">,</span> <span class="n">output_check_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+               <span class="n">event_range</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">1000000</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Checks the hit table to have proper data.</span>
+
+<span class="sd">    The checks include:</span>
+<span class="sd">      - hit definitions:</span>
+<span class="sd">          - position has to start at 1 (not 0)</span>
+<span class="sd">          - position should not exceed number of pixels (n_pixel)</span>
+<span class="sd">      - event building</span>
+<span class="sd">          - event number has to be strictly monotone</span>
+<span class="sd">          - hit position correlations of consecutive events are</span>
+<span class="sd">            created. Should be zero for distinctly</span>
+<span class="sd">            built events.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_hits_file : string</span>
+<span class="sd">        File name of the hit table.</span>
+<span class="sd">    output_check_file : string</span>
+<span class="sd">        Filename of the output file with the correlation histograms.</span>
+<span class="sd">    n_pixel : tuple</span>
+<span class="sd">        Tuple of the total number of pixels (column/row).</span>
+<span class="sd">    event_range : integer</span>
+<span class="sd">        The range of events to correlate.</span>
+<span class="sd">        E.g.: event_range = 2 correlates to predecessing event hits.</span>
+<span class="sd">    chunk_size : int</span>
+<span class="sd">        Chunk size of the data when reading from file.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;=== Check data of hit file </span><span class="si">%s</span><span class="s1"> ===&#39;</span><span class="p">,</span> <span class="n">input_hits_file</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">output_check_file</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">output_check_file</span> <span class="o">=</span> <span class="n">input_hits_file</span><span class="p">[:</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_check.h5&#39;</span>
+
+    <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">output_check_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">out_file_h5</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_file_h5</span><span class="p">:</span>
+            <span class="n">shape_column</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_pixel</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">n_pixel</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">shape_row</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_pixel</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">n_pixel</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">col_corr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape_column</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+            <span class="n">row_corr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape_row</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+            <span class="n">last_event</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">out_dE</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_earray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;EventDelta&#39;</span><span class="p">,</span>
+                                               <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Change of event number per non empty event&#39;</span><span class="p">,</span>
+                                               <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">),</span>
+                                               <span class="n">atom</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Atom</span><span class="o">.</span><span class="n">from_dtype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint64</span><span class="p">)),</span>
+                                               <span class="n">filters</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Filters</span><span class="p">(</span><span class="n">complib</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span>
+                                                                  <span class="n">complevel</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+                                                                  <span class="n">fletcher32</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+            <span class="n">out_E</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_earray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;EventNumber&#39;</span><span class="p">,</span>
+                                              <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Event number of non empty event&#39;</span><span class="p">,</span>
+                                              <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">),</span>
+                                              <span class="n">atom</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Atom</span><span class="o">.</span><span class="n">from_dtype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint64</span><span class="p">)),</span>
+                                              <span class="n">filters</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Filters</span><span class="p">(</span><span class="n">complib</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span>
+                                                                 <span class="n">complevel</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+                                                                 <span class="n">fletcher32</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+
+            <span class="k">for</span> <span class="n">hits</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">analysis_utils</span><span class="o">.</span><span class="n">data_aligned_at_events</span><span class="p">(</span>
+                    <span class="n">input_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">Hits</span><span class="p">,</span>
+                    <span class="n">chunk_size</span><span class="o">=</span><span class="n">chunk_size</span><span class="p">):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">hits</span><span class="p">[</span><span class="s1">&#39;event_number&#39;</span><span class="p">])</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;The event number does not always increase. </span><span class="se">\</span>
+<span class="s1">                    The hits cannot be used like this!&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">hits</span><span class="p">[</span><span class="s1">&#39;column&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">or</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">hits</span><span class="p">[</span><span class="s1">&#39;row&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;The column/row definition does not </span><span class="se">\</span>
+<span class="s1">                    start at 1!&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">hits</span><span class="p">[</span><span class="s1">&#39;column&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">n_pixel</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                        <span class="ow">or</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">hits</span><span class="p">[</span><span class="s1">&#39;row&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">n_pixel</span><span class="p">[</span><span class="mi">1</span><span class="p">])):</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;The column/row definition exceed the nuber </span><span class="se">\</span>
+<span class="s1">                    of pixels (</span><span class="si">%s</span><span class="s1">/</span><span class="si">%s</span><span class="s1">)!&#39;</span><span class="p">,</span> <span class="n">n_pixel</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">n_pixel</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+                <span class="n">analysis_utils</span><span class="o">.</span><span class="n">correlate_hits_on_event_range</span><span class="p">(</span><span class="n">hits</span><span class="p">,</span>
+                                                             <span class="n">col_corr</span><span class="p">,</span>
+                                                             <span class="n">row_corr</span><span class="p">,</span>
+                                                             <span class="n">event_range</span><span class="p">)</span>
+
+                <span class="n">event_numbers</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">hits</span><span class="p">[</span><span class="s1">&#39;event_number&#39;</span><span class="p">])</span>
+                <span class="n">event_delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">event_numbers</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">last_event</span><span class="p">:</span>
+                    <span class="n">event_delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">event_numbers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">last_event</span><span class="p">]),</span>
+                                                  <span class="n">event_delta</span><span class="p">))</span>
+                <span class="n">last_event</span> <span class="o">=</span> <span class="n">event_numbers</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+                <span class="n">out_dE</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">event_delta</span><span class="p">)</span>
+                <span class="n">out_E</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">event_numbers</span><span class="p">)</span>
+
+            <span class="n">out_col</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;CorrelationColumns&#39;</span><span class="p">,</span>
+                                                <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Column Correlation with event range=</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">event_range</span><span class="p">,</span>
+                                                <span class="n">atom</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Atom</span><span class="o">.</span><span class="n">from_dtype</span><span class="p">(</span><span class="n">col_corr</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
+                                                <span class="n">shape</span><span class="o">=</span><span class="n">col_corr</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
+                                                <span class="n">filters</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Filters</span><span class="p">(</span><span class="n">complib</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span>
+                                                                   <span class="n">complevel</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+                                                                   <span class="n">fletcher32</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+            <span class="n">out_row</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;CorrelationRows&#39;</span><span class="p">,</span>
+                                                <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Row Correlation with event range=</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">event_range</span><span class="p">,</span>
+                                                <span class="n">atom</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Atom</span><span class="o">.</span><span class="n">from_dtype</span><span class="p">(</span><span class="n">row_corr</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
+                                                <span class="n">shape</span><span class="o">=</span><span class="n">row_corr</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
+                                                <span class="n">filters</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Filters</span><span class="p">(</span><span class="n">complib</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span>
+                                                                   <span class="n">complevel</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+                                                                   <span class="n">fletcher32</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+            <span class="n">out_col</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">col_corr</span>
+            <span class="n">out_row</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">row_corr</span>
+
+    <span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+        <span class="n">plot_utils</span><span class="o">.</span><span class="n">plot_checks</span><span class="p">(</span><span class="n">input_corr_file</span><span class="o">=</span><span class="n">output_check_file</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="generate_pixel_mask"><a class="viewcode-back" href="../../hit_analysis.html#testbeam_analysis.hit_analysis.generate_pixel_mask">[docs]</a><span class="k">def</span> <span class="nf">generate_pixel_mask</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">,</span> <span class="n">n_pixel</span><span class="p">,</span> <span class="n">pixel_mask_name</span><span class="o">=</span><span class="s2">&quot;NoisyPixelMask&quot;</span><span class="p">,</span> <span class="n">output_mask_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pixel_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span> <span class="n">filter_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">dut_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">1000000</span><span class="p">):</span>
@@ -392,9 +499,9 @@
             <span class="n">io_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">Cluster</span><span class="p">[</span><span class="n">start_index</span><span class="p">:</span><span class="n">start_index</span> <span class="o">+</span> <span class="n">chunk_size</span><span class="p">]</span> <span class="o">=</span> <span class="n">clusters</span>
 
     <span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
-        <span class="n">plot_cluster_size</span><span class="p">(</span><span class="n">output_cluster_file</span><span class="p">,</span> <span class="n">dut_name</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">output_cluster_file</span><span class="p">)[</span><span class="mi">1</span><span class="p">],</span>
-                          <span class="n">output_pdf_file</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">output_cluster_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_cluster_size.pdf&#39;</span><span class="p">,</span>
-                          <span class="n">chunk_size</span><span class="o">=</span><span class="n">chunk_size</span><span class="p">,</span> <span class="n">gui</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">plot_cluster_size</span><span class="p">(</span><span class="n">hight</span><span class="p">,</span> <span class="n">n_hits</span><span class="p">,</span> <span class="n">n_clusters</span><span class="p">,</span> <span class="n">max_cluster_size</span><span class="p">,</span>
+                          <span class="n">dut_name</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">output_cluster_file</span><span class="p">)[</span><span class="mi">1</span><span class="p">],</span>
+                          <span class="n">output_pdf_file</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">output_cluster_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_cluster_size.pdf&#39;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">output_cluster_file</span></div>
 </pre></div>
