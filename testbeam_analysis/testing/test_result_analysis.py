@@ -1,17 +1,11 @@
 ''' Script to check the correctness of the analysis. The analysis is done on raw data and all results are compared to a recorded analysis.
 '''
 import os
-
+import shutil
 import unittest
 
 from testbeam_analysis import result_analysis
-
-# Get package path
-testing_path = os.path.dirname(__file__)  # Get the absoulte path of the online_monitor installation
-
-# Set the converter script path
-tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(testing_path)) + r'/testing/fixtures/result_analysis/'))
-
+from testbeam_analysis.tools import analysis_utils, test_tools
 
 class TestResultAnalysis(unittest.TestCase):
 
@@ -21,22 +15,21 @@ class TestResultAnalysis(unittest.TestCase):
             from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
-        cls.output_folder = tests_data_folder
+        cls.output_folder = 'test_res_output'
+        test_tools.create_folder(cls.output_folder)
         cls.pixel_size = [250, 50] * 4  # in um
         cls.n_pixels = [80, 336] * 4
         cls.z_positions = [0., 19500, 108800, 128300]  # in um
 
     @classmethod
     def tearDownClass(cls):  # remove created files
-        os.remove(os.path.join(cls.output_folder, 'Efficiency.h5'))
-        os.remove(os.path.join(cls.output_folder, 'Efficiency.pdf'))
-        os.remove(os.path.join(cls.output_folder, 'Residuals.h5'))
-        os.remove(os.path.join(cls.output_folder, 'Residuals.pdf'))
+        pass
+        #shutil.rmtree(cls.output_folder)
 
     @unittest.SkipTest
     def test_residuals_calculation(self):
-        residuals = result_analysis.calculate_residuals(input_tracks_file=os.path.join(tests_data_folder, 'Tracks_result.h5'),
-                                                        input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
+        residuals = result_analysis.calculate_residuals(input_tracks_file=analysis_utils.get_data('fixtures/result_analysis/Tracks_result.h5'),
+                                                        input_alignment_file=analysis_utils.get_data('fixtures/result_analysis/Alignment_result.h5'),
                                                         output_residuals_file=os.path.join(self.output_folder, 'Residuals.h5'),
                                                         n_pixels=self.n_pixels,
                                                         pixel_size=self.pixel_size,
@@ -49,16 +42,20 @@ class TestResultAnalysis(unittest.TestCase):
 
     @unittest.SkipTest
     def test_efficiency_calculation(self):
-        efficiencies = result_analysis.calculate_efficiency(tracks_file=os.path.join(self.output_folder, 'Tracks_result.h5'),
+        efficiencies = result_analysis.calculate_efficiency(input_tracks_file=analysis_utils.get_data('fixtures/result_analysis/Tracks_result.h5'),
+                                                            input_alignment_file=analysis_utils.get_data('fixtures/result_analysis/Alignment_result.h5'),
                                                             output_efficiency_file=os.path.join(self.output_folder, 'Efficiency.h5'),
-                                                            z_positions=self.z_positions,
-                                                            bin_size=(250, 50),
+                                                            bin_size=[(250, 50)]*4,
+                                                            sensor_size=[(250 * 80., 336 * 50.)]*4,
+                                                            pixel_size=[(250, 50)]*4,
+                                                            n_pixels=[(80, 336)]*4,
                                                             minimum_track_density=2,
                                                             use_duts=None,
                                                             cut_distance=500,
                                                             max_distance=500,
-                                                            col_range=(1250, 17500),
-                                                            row_range=(1000, 16000))
+                                                            #col_range=[(1250, 17500)]*4,
+                                                            #row_range=[(1000, 16000)]*4,
+                                                            force_prealignment=True)
 
         self.assertAlmostEqual(efficiencies[0], 100.000, msg='DUT 0 efficiencies do not match', places=3)
         self.assertAlmostEqual(efficiencies[1], 98.7013, msg='DUT 1 efficiencies do not match', places=3)
