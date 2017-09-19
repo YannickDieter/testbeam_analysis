@@ -20,9 +20,11 @@ class TestAlignmentAnalysis(unittest.TestCase):
             from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
-
+        # Define test data input files, download if needed
         cls.data_files = [analysis_utils.get_data(r'fixtures/dut_alignment/Cluster_DUT%d_cluster.h5' % i) for i in range(4)]
-        cls.output_folder = os.path.dirname(os.path.realpath(cls.data_files[0]))
+        # Define and create tests output folder, is deleted at the end of tests
+        cls.output_folder = os.path.join(os.path.dirname(os.path.realpath(cls.data_files[0])), 'output')
+        test_tools.create_folder(cls.output_folder)
         cls.n_pixels = [(80, 336)] * 4
         cls.pixel_size = [(250, 50)] * 4  # in um
         cls.z_positions = [0., 19500, 108800, 128300]
