@@ -11,14 +11,6 @@ import matplotlib.pyplot as plt
 
 from testbeam_analysis.tools import simulate_data, geometry_utils, analysis_utils, test_tools
 
-# Get package path
-# Get the absoulte path of the testbeam analysis installation
-testing_path = os.path.dirname(__file__)
-
-# Set the converter script path
-tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(
-    os.path.realpath(testing_path)) + r'/testing/fixtures/simulation/'))
-
 
 class TestHitAnalysis(unittest.TestCase):
 
@@ -33,10 +25,10 @@ class TestHitAnalysis(unittest.TestCase):
 
         self.simulate_data = simulate_data.SimulateData(random_seed=0)
 
-#     @classmethod
-#     def tearDownClass(self):  # remove created files
-#         for dut_index in range(self.simulate_data.n_duts):
-#             os.remove('simulated_data_DUT%d.h5' % dut_index)
+    @classmethod
+    def tearDownClass(self):  # remove created files
+        for dut_index in range(self.simulate_data.n_duts):
+            os.remove('simulated_data_DUT%d.h5' % dut_index)
 
     # Test beam position with respect to devices positions
     def test_position(self):
@@ -463,8 +455,9 @@ class TestHitAnalysis(unittest.TestCase):
             'simulated_data', n_events=10000)
 
         for dut_index in range(self.simulate_data.n_duts):
-            data_equal, error_msg = test_tools.compare_h5_files('simulated_data_DUT%d.h5' % dut_index, os.path.join(
-                tests_data_folder, 'simulated_data_DUT%d.h5' % dut_index), exact=False)
+            data_equal, error_msg = test_tools.compare_h5_files('simulated_data_DUT%d.h5' % dut_index,
+                                                                analysis_utils.get_data('fixtures/simulation/simulated_data_DUT%d.h5' % dut_index),
+                                                                exact=False)
             self.assertTrue(data_equal, msg=error_msg)
 
 
