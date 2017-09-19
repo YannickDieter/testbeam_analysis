@@ -1002,8 +1002,9 @@ def get_data(path, output=None, fail_on_overwrite=False):
 
     if not output:
         output = os.path.basename(path)
-
-    output_path = os.path.dirname(os.path.realpath(path))
+        output_path = os.path.dirname(os.path.realpath(path))
+    else:
+        output_path = os.path.dirname(os.path.realpath(output))
 
     if not os.path.isfile(os.path.join(output_path, output)):
         # Create output folder
