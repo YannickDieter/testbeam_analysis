@@ -2,14 +2,37 @@
 from __future__ import division
 
 import os
+import dill
 import tempfile
 import logging
 import numpy as np
 import tables as tb
 from collections import Iterable
 
-from pathos import multiprocessing
-from pathos.pools import ProcessPool
+from multiprocessing import Pool, cpu_count
+
+
+def apply_async(pool, fun, args=None, **kwargs):
+    ''' Run fun(*args, **kwargs) in different process.
+
+    fun can be a complex function since pickling is not done with the
+    cpickle module as multiprocessing.apply_async would do, but with
+    the more powerfull dill serialization.
+    Additionally kwargs can be given and args can be given'''
+    payload = dill.dumps((fun, args, kwargs))
+    return pool.apply_async(_run_with_dill, (payload,))
+
+
+def _run_with_dill(payload):
+    ''' Unpickle payload with dill.
+
+    The payload is the function plus arguments and keyword arguments.
+    '''
+    fun, args, kwargs = dill.loads(payload)
+    if args:
+        return fun(*args, **kwargs)
+    else:
+        return fun(**kwargs)
 
 
 class SMC(object):
@@ -104,12 +127,13 @@ class SMC(object):
                 self.table_desc['title'] = node.title
 
         if not self.n_cores:  # Set n_cores to maximum cores available
-            self.n_cores = multiprocessing.cpu_count()
+            self.n_cores = cpu_count()
             # Deactivate multithreading for small data sets
             # Overhead of pools can make multiprocesssing slower
-            if self.n_rows < self.chunk_size:
+            if self.n_rows < 2. * self.chunk_size:
                 self.n_cores = 1
 
+        # The three main step
         self._split()
         self._map()
         self._combine()
@@ -119,14 +143,6 @@ class SMC(object):
         assert len(self.start_i) == len(self.stop_i)
 
     def _map(self):
-        # Output node name set to input node name
-        node_name = self.node_name
-        # Try to set output node name if defined
-        try:
-            node_name = self.table_desc['name']
-        except KeyError:
-            pass
-
         if self.n_cores == 1:
             self.tmp_files = [self._work(self.table_file_in,
                                          self.node_name,
@@ -137,18 +153,31 @@ class SMC(object):
                                          self.chunk_size)]
         else:
             # Run function in parallel
-            # Pathos reuses pools for speed up, is this correct?
-            pool = ProcessPool(self.n_cores)
-            self.tmp_files = pool.map(self._work,
-                                      [self.table_file_in] * self.n_cores,
-                                      [self.node_name] * self.n_cores,
-                                      [self.func] * self.n_cores,
-                                      [self.table_desc] * self.n_cores,
-                                      [self.start_i[i]
-                                          for i in range(self.n_cores)],
-                                      [self.stop_i[i]
-                                          for i in range(self.n_cores)],
-                                      [self.chunk_size] * self.n_cores)
+            pool = Pool(self.n_cores)
+    
+            jobs = []
+            for i in range(self.n_cores):
+                job = apply_async(pool=pool,
+                                    fun=self._work,
+                                    table_file_in=self.table_file_in,
+                                    node_name=self.node_name,
+                                    func=self.func,
+                                    table_desc=self.table_desc,
+                                    start_i=self.start_i[i],
+                                    stop_i=self.stop_i[i],
+                                    chunk_size=self.chunk_size
+                                    )
+                jobs.append(job)
+    
+            # Gather results
+            self.tmp_files = []
+            for job in jobs:
+                self.tmp_files.append(job.get())
+    
+            pool.close()
+            pool.join()
+            
+            del pool
 
     def _combine(self):
         # Use first tmp file as result file
@@ -177,7 +206,7 @@ class SMC(object):
         '''
 
         core_chunk_size = self.n_rows // self.n_cores
-        start_indeces = range(0, self.n_rows, core_chunk_size)
+        start_indeces = range(0, self.n_rows, core_chunk_size)[:self.n_cores]
 
         if not self.align_at:
             stop_indeces = start_indeces[1:]
@@ -189,7 +218,7 @@ class SMC(object):
 
         assert len(stop_indeces) == self.n_cores
         assert len(start_indeces) == self.n_cores
-#         raise
+
         return start_indeces, stop_indeces
 
     def _get_next_index(self, indeces):
@@ -216,13 +245,6 @@ class SMC(object):
         Reads data, applies the function and stores data in chunks into a table.
         '''
 
-        # It is needed to import needed modules in every pickled function
-        # It is not too clear to what this implies
-        import tempfile
-        import numpy as np
-        import tables as tb
-        from testbeam_analysis.tools import analysis_utils
-
         with tb.open_file(table_file_in, 'r') as in_file:
             node = in_file.get_node(in_file.root, node_name)
 
@@ -235,7 +257,7 @@ class SMC(object):
                 else:  # Data format unknown
                     table_out = None
 
-                for data, i in self.chunks_aligned_at_events(table=node,
+                for data, _ in self.chunks_aligned_at_events(table=node,
                                                              start_index=start_i,
                                                              stop_index=stop_i,
                                                              chunk_size=chunk_size):
@@ -322,7 +344,6 @@ if __name__ == '__main__':
     def f(data):
         # It is needed to import needed modules in every pickled function
         # It is not too clear to me what this implies
-        import numpy as np
         n_duts = 2
         description = [('event_number', np.int64)]
         for index in range(n_duts):
@@ -357,3 +378,4 @@ if __name__ == '__main__':
         func=f, align_at='event_number',
         n_cores=1,
         chunk_size=1000)
+
