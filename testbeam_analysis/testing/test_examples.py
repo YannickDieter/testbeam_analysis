@@ -9,29 +9,17 @@ from shutil import copyfile
 import tables as tb
 
 import testbeam_analysis
-from testbeam_analysis.tools import data_selection
+from testbeam_analysis.tools import (analysis_utils,
+                                     test_tools,
+                                     data_selection)
 from testbeam_analysis.examples import (eutelescope,
                                         fei4_telescope,
                                         simulated_data)
 
-# Get the absoulte path of the online_monitor installation
-testing_path = os.path.dirname(__file__)
-package_path = os.path.dirname(testbeam_analysis.__file__)
-script_folder = os.path.abspath(os.path.join(package_path, r'examples/'))
-fixture_folder = os.path.abspath(os.path.join(os.path.dirname(
-    os.path.realpath(testing_path)) + r'/testing/fixtures/examples/'))
-tests_data_folder = os.path.abspath(
-    os.path.join(os.path.realpath(script_folder), r'data/'))
 
-
-def copy_alignment(path, out_folder, **kwarg):
-    try:
-        os.mkdir(os.path.join(tests_data_folder, out_folder))
-    except OSError:
-        pass
-    copyfile(os.path.join(fixture_folder, path),
-             os.path.join(tests_data_folder,
-                          os.path.join(out_folder, 'Alignment.h5')))
+def copy_data(path, out_path, **kwarg):
+    test_tools.create_folder(os.path.dirname(out_path))
+    copyfile(path, out_path)
 
 
 # Wrapps the original fit tracks call to reduce the number of fitted DUTs
@@ -78,47 +66,44 @@ class TestExamples(unittest.TestCase):
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
 
-        cls.output_folder = tests_data_folder
-
+        # Download example data
         # Reduce the example data to make it possible to test the examples in
         # CI environments
-        cls.examples_fei4_hit_files = [os.path.join(
-            cls.output_folder,
-            r'TestBeamData_FEI4_DUT0.h5'),
-            os.path.join(
-            cls.output_folder,
-            r'TestBeamData_FEI4_DUT1.h5'),
-            os.path.join(
-            cls.output_folder,
-            r'TestBeamData_FEI4_DUT4.h5'),
-            os.path.join(
-            cls.output_folder,
-            r'TestBeamData_FEI4_DUT5.h5')]
-        data_selection.reduce_hit_files(
-            cls.examples_fei4_hit_files, fraction=100)
-
-        cls.examples_mimosa_hit_files = [os.path.join(
-            cls.output_folder,
-            r'TestBeamData_Mimosa26_DUT%d.h5') % i for i in range(6)]
-        data_selection.reduce_hit_files(
-            cls.examples_mimosa_hit_files, fraction=100)
-
-        # Remove old files and rename reduced files
-        for file_name in cls.examples_fei4_hit_files:
-            os.remove(file_name)
-            os.rename(os.path.splitext(file_name)[0] + '_reduced.h5',
-                      file_name)
-        for file_name in cls.examples_mimosa_hit_files:
-            os.remove(file_name)
-            os.rename(os.path.splitext(file_name)[0] + '_reduced.h5',
-                      file_name)
+        try:
+            cls.examples_fei4_hit_files = [analysis_utils.get_data(path='examples/TestBeamData_FEI4_DUT%d.h5' % i,
+                                                                   fail_on_overwrite=True)
+                                                                   for i in [0, 1, 4, 5]]
+            data_selection.reduce_hit_files(cls.examples_fei4_hit_files,
+                                            fraction=100)
+            # Remove old files and rename reduced files
+            for file_name in cls.examples_fei4_hit_files:
+                os.remove(file_name)
+                os.rename(os.path.splitext(file_name)[0] + '_reduced.h5',
+                          file_name)
+        except RuntimeError: # Files are already downloaded and reduced
+            cls.examples_fei4_hit_files = [os.path.join('examples', 'TestBeamData_FEI4_DUT%d.h5' % i)
+                                           for i in [0, 1, 4, 5]]
+        try:
+            cls.examples_mimosa_hit_files = [analysis_utils.get_data(path='examples/TestBeamData_Mimosa26_DUT%d.h5' % i,
+                                                                   fail_on_overwrite=True)
+                                                                   for i in range(6)]
+            data_selection.reduce_hit_files(cls.examples_mimosa_hit_files,
+                                            fraction=100)
+            # Remove old files and rename reduced files
+            for file_name in cls.examples_mimosa_hit_files:
+                os.remove(file_name)
+                os.rename(os.path.splitext(file_name)[0] + '_reduced.h5',
+                          file_name)
+        except RuntimeError: # Files are already downloaded and reduced
+            cls.examples_mimosa_hit_files = [os.path.join('examples', 'TestBeamData_Mimosa26_DUT%d.h5' % i)
+                                           for i in range(6)]
 
     # Alignments do not converge for reduced data set
     # Thus mock out the alignment steps
     @mock.patch('testbeam_analysis.dut_alignment.prealignment',
-                side_effect=copy_alignment(
-                    path=r'eutelescope/Alignment.h5',
-                    out_folder=r'output_eutel')
+                side_effect=copy_data(
+                    path=analysis_utils.get_data(path='fixtures/examples/eutelescope/Alignment.h5'),
+                    out_path=r'examples/output_eutel/Alignment.h5')
                 )
     @mock.patch('testbeam_analysis.dut_alignment.alignment')
     # TODO: Analysis fails, to be checked why
@@ -126,17 +111,17 @@ class TestExamples(unittest.TestCase):
                 side_effect=fit_tracks_fast)
     @mock.patch('testbeam_analysis.result_analysis.calculate_residuals')
     def test_mimosa_example(self, m1, m2, m3, m4):
-        eutelescope.run_analysis()
+        eutelescope.run_analysis(self.examples_mimosa_hit_files)
 
     # Prealignment does not converge for reduced data set
     # Thus mock out the prealignment
     @mock.patch('testbeam_analysis.dut_alignment.prealignment',
-                side_effect=copy_alignment(
-                    path=r'fei4_telescope/Alignment.h5',
-                    out_folder=r'output_fei4'),
+                side_effect=copy_data(
+                    path=analysis_utils.get_data(path='fixtures/examples/fei4_telescope/Alignment.h5'),
+                    out_path=r'examples/output_fei4/Alignment.h5')
                 )
     def test_fei4_example(self, mock):
-        fei4_telescope.run_analysis()
+        fei4_telescope.run_analysis(self.examples_fei4_hit_files)
 
     def test_simulated_data_example(self):
         ''' Check the example and the overall analysis that a efficiency of
