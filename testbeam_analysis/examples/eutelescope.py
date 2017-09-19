@@ -82,8 +82,6 @@ def run_analysis(data_files):
                                          pixel_size=pixel_size[i],
                                          threshold=0.5,
                                          dut_name=dut_names[i])
-    
-    raise
 
     # Cluster hits from all DUTs
     # A pool of workers to cluster hits for all files in parallel
