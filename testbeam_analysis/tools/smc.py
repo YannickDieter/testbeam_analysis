@@ -39,8 +39,8 @@ def _run_with_dill(payload):
 class SMC(object):
 
     def __init__(self, table_file_in, file_out,
-                 func, node_desc={}, table=None, align_at=None,
-                 n_cores=None, chunk_size=1000000):
+                 func, func_kwargs={}, node_desc={}, table=None,
+                 align_at=None, n_cores=None, chunk_size=1000000):
         ''' Apply a function to a pytable on multiple cores in chunks.
 
             Parameters
@@ -51,6 +51,8 @@ class SMC(object):
                 File name with the resulting table/histogram.
             func : function
                 Function to be applied on table chunks.
+            func_kwargs : dict
+                Additional kwargs to pass to worker function
             node_desc : dict, None
                 Output table/array parameters from pytables.table().
                 If None filters are set from input table and data
@@ -89,6 +91,7 @@ class SMC(object):
         self.func = func
         self.node_desc = node_desc
         self.chunk_size = chunk_size
+        self.func_kwargs = func_kwargs
 
         # Get the table node name
         with tb.open_file(table_file_in) as in_file:
@@ -149,6 +152,7 @@ class SMC(object):
             self.tmp_files = [self._work(self.table_file_in,
                                          self.node_name,
                                          self.func,
+                                         self.func_kwargs,
                                          self.node_desc,
                                          self.start_i[0],
                                          self.stop_i[0],
@@ -164,6 +168,7 @@ class SMC(object):
                                     table_file_in=self.table_file_in,
                                     node_name=self.node_name,
                                     func=self.func,
+                                    func_kwargs=self.func_kwargs,
                                     node_desc=self.node_desc,
                                     start_i=self.start_i[i],
                                     stop_i=self.stop_i[i],
@@ -181,7 +186,7 @@ class SMC(object):
             
             del pool   
 
-    def _work(self, table_file_in, node_name, func,
+    def _work(self, table_file_in, node_name, func, func_kwargs,
               node_desc, start_i, stop_i, chunk_size):
         ''' Defines the work per worker.
 
@@ -208,7 +213,7 @@ class SMC(object):
                                                              stop_index=stop_i,
                                                              chunk_size=chunk_size):
 
-                    data_ret = func(data)
+                    data_ret = func(data, **func_kwargs)
                     # Create table if not existing
                     # Extract data type from returned data
                     if not table_out:
