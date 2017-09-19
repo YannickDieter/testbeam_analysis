@@ -49,22 +49,14 @@ from multiprocessing import Pool
 
 from testbeam_analysis import (hit_analysis, dut_alignment, track_analysis,
                                result_analysis)
+from testbeam_analysis.tools import analysis_utils
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s]\
      (%(threadName)-10s) %(message)s")
 
 
-def run_analysis():
-    # Get the absolute path of example data
-    tests_data_folder = os.path.join(os.path.dirname(
-        os.path.abspath(inspect.getfile(inspect.currentframe()))), 'data')
-
-    # The location of the example data files, one file per DUT
-    data_files = [os.path.join(tests_data_folder,
-                               'TestBeamData_Mimosa26_DUT%d.h5' % i)
-                  for i in range(6)]
-
+def run_analysis(data_files):
     # Pixel dimesions and matrix size of the DUTs
     pixel_size = [(18.4, 18.4)] * 6  # Column, row pixel pitch in um
     n_pixels = [(1152, 576)] * 6  # Number of pixel on column, row
@@ -312,4 +304,11 @@ def run_analysis():
 
 # Main entry point is needed for multiprocessing under windows
 if __name__ == '__main__':
-    run_analysis()
+    # Get the absolute path of example data
+    tests_data_folder = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), 'data')
+    # The location of the data files, one file per DUT
+    data_files = [analysis_utils.get_data(path='examples/TestBeamData_Mimosa26_DUT%d.h5' % i,
+                                          output=os.path.join(tests_data_folder,
+                                                                   'TestBeamData_Mimosa26_DUT%d.h5' % i)) for i in range(6)]  # The first device is the reference for the coordinate system
+
+    run_analysis(data_files)
