@@ -55,3 +55,5 @@ testbeam_analysis/examples/data/*.h5
 tmp*.*
 # Downloaded data files
 fixtures
+testbeam_analysis/testing/simulation
+testbeam_analysis/testing/examples
