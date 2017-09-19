@@ -217,7 +217,7 @@ class SMC(object):
                                                               description=data_ret.dtype,
                                                               **node_desc)
                         # Create histogram if data is not a table
-                        else:
+                        elif hist_out is None:
                             hist_out = data_ret
                             continue
                             
