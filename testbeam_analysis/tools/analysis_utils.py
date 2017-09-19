@@ -20,6 +20,7 @@ from testbeam_analysis import analysis_functions
 import testbeam_analysis.tools.plot_utils
 from testbeam_analysis.cpp import data_struct
 
+# A public secret representing public, read only owncloud folder
 SCIBO_PUBLIC_FOLDER = 'NzfAx2zAQll5YXB'
 
 
@@ -961,7 +962,23 @@ def hough_transform(img, theta_res=1.0, rho_res=1.0, return_edges=False):
         return accumulator, thetas, rhos  # return histogram and bin centers
 
 
-def get_data(path, output=None):
+def get_data(path, output=None, fail_on_overwrite=False):
+    ''' Downloads data (eg. for examples, fixtures).
+    
+        Uses data in a public scibo folder. If you want
+        write access contact the maintainer.
+        
+        Parameters
+        ----------
+        path : string
+            File path with name. Location on online folder.
+        output : string, None
+            File path with name. Location where to store data.
+            If None the path variable path is used.
+        fail_on_overwrite : Bool
+            If files exist already the download is skipped.
+            If fail_on_overwrite this raises a RuntimeError.
+    '''
     def download_scibo(public_secret, path, filename):
         folder = os.path.dirname(path)
         name = os.path.basename(path)
@@ -999,5 +1016,7 @@ def get_data(path, output=None):
         download_scibo(public_secret=SCIBO_PUBLIC_FOLDER,
                        path=path,
                        filename=os.path.join(output_path, output))
-
+    elif fail_on_overwrite:
+        raise RuntimeError('The files %s exists already', output)
+    
     return os.path.join(output_path, output)
