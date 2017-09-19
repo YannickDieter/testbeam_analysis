@@ -18,6 +18,10 @@ class TestHitAnalysis(unittest.TestCase):
             from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
+            
+        cls.big_noisy_data_file = analysis_utils.get_data(path='fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0.h5',
+                                                            output=os.path.join(testing_path, 'fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0.h5'))
+            
         cls.noisy_data_file = analysis_utils.get_data('fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0_small.h5',
                                                       output=os.path.join(testing_path, 'fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0_small.h5'))
         cls.data_file = analysis_utils.get_data('fixtures/hit_analysis/TestBeamData_FEI4_DUT0_small.h5',
@@ -31,15 +35,15 @@ class TestHitAnalysis(unittest.TestCase):
         shutil.rmtree(cls.output_folder)
         
     def test_generate_pixel_mask(self):
-        output_mask_file = hit_analysis.generate_pixel_mask(input_hits_file=self.noisy_data_file,
-                                                            output_mask_file=os.path.join(self.output_folder, 'TestBeamData_Mimosa26_DUT0_small_noisy_pixel_mask.h5'),
+        output_mask_file = hit_analysis.generate_pixel_mask(input_hits_file=self.big_noisy_data_file,
+                                                            output_mask_file=os.path.join(self.output_folder, 'TestBeamData_Mimosa26_DUT0_noisy_pixel_mask.h5'),
                                                             pixel_mask_name="NoisyPixelMask",
-                                                            threshold=10.0, n_pixel=(1152, 576),
+                                                            threshold=0.5, n_pixel=(1152, 576),
                                                             pixel_size=(18.4, 18.4), plot=True)
         
-        data_equal, error_msg = test_tools.compare_h5_files(analysis_utils.get_data('fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0_small_noisy_pixel_mask.h5',
+        data_equal, error_msg = test_tools.compare_h5_files(analysis_utils.get_data('fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0_noisy_pixel_mask.h5',
                                                                                     output=os.path.join(testing_path,
-                                                                                                        'fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0_small_noisy_pixel_mask.h5')),
+                                                                                                        'fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0_noisy_pixel_mask.h5')),
                                                             output_mask_file)
         self.assertTrue(data_equal, msg=error_msg)
 
