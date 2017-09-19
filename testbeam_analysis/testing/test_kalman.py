@@ -9,12 +9,6 @@ import numpy as np
 from testbeam_analysis import track_analysis
 from testbeam_analysis.tools import test_tools
 
-# Get package path
-testing_path = os.path.dirname(__file__)  # Get the absoulte path of the online_monitor installation
-
-# Set the converter script path
-tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(testing_path)) + r'/testing/fixtures/track_analysis/'))
-
 
 class TestTrackAnalysis(unittest.TestCase):
 
@@ -24,8 +18,6 @@ class TestTrackAnalysis(unittest.TestCase):
             from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
-        # cls.output_folder = tests_data_folder
-        # cls.pixel_size = (250, 50)  # in um
 
     @classmethod
     def tearDownClass(cls):  # Remove created files
