@@ -2,14 +2,15 @@
 from __future__ import division
 
 import os
-import dill
+import shutil
 import tempfile
 import logging
+from collections import Iterable
+from multiprocessing import Pool, cpu_count
+
+import dill
 import numpy as np
 import tables as tb
-from collections import Iterable
-
-from multiprocessing import Pool, cpu_count
 
 
 def apply_async(pool, fun, args=None, **kwargs):
@@ -37,8 +38,8 @@ def _run_with_dill(payload):
 
 class SMC(object):
 
-    def __init__(self, table_file_in, table_file_out,
-                 func, table_desc={}, table=None, align_at=None,
+    def __init__(self, table_file_in, file_out,
+                 func, node_desc={}, table=None, align_at=None,
                  n_cores=None, chunk_size=1000000):
         ''' Apply a function to a pytable on multiple cores in chunks.
 
@@ -46,12 +47,12 @@ class SMC(object):
             ----------
             table_file_in : string
                 File name of the file with the table.
-            table_file_out : string
-                File name with the resulting table.
+            file_out : string
+                File name with the resulting table/histogram.
             func : function
                 Function to be applied on table chunks.
-            table_desc : dict, None
-                Output table parameters from pytables.table().
+            node_desc : dict, None
+                Output table/array parameters from pytables.table().
                 If None filters are set from input table and data
                 format is set from return value of func.
             table : string, iterable of strings, None
@@ -76,16 +77,17 @@ class SMC(object):
             - map: the function is called on each chunk. If the chunk per core
               is still too large to fit in memory it is chunked further. The result
               is written to a table per core.
-            - combine: the tables are merged into one result table
+            - combine: the tables are merged into one result table or one result
+                        histogram depending on the output data format
             '''
 
         # Set parameters
         self.table_file_in = table_file_in
-        self.table_file_out = table_file_out
+        self.file_out = file_out
         self.n_cores = n_cores
         self.align_at = align_at
         self.func = func
-        self.table_desc = table_desc
+        self.node_desc = node_desc
         self.chunk_size = chunk_size
 
         # Get the table node name
@@ -119,12 +121,12 @@ class SMC(object):
             self.n_rows = node.shape[0]
 
             # Set output parameters for output table
-            if 'filter' not in self.table_desc:
-                self.table_desc['filters'] = node.filters
-            if 'name' not in self.table_desc:
-                self.table_desc['name'] = node.name
-            if 'title' not in self.table_desc:
-                self.table_desc['title'] = node.title
+            if 'filter' not in self.node_desc:
+                self.node_desc['filters'] = node.filters
+            if 'name' not in self.node_desc:
+                self.node_desc['name'] = node.name
+            if 'title' not in self.node_desc:
+                self.node_desc['title'] = node.title
 
         if not self.n_cores:  # Set n_cores to maximum cores available
             self.n_cores = cpu_count()
@@ -147,7 +149,7 @@ class SMC(object):
             self.tmp_files = [self._work(self.table_file_in,
                                          self.node_name,
                                          self.func,
-                                         self.table_desc,
+                                         self.node_desc,
                                          self.start_i[0],
                                          self.stop_i[0],
                                          self.chunk_size)]
@@ -162,7 +164,7 @@ class SMC(object):
                                     table_file_in=self.table_file_in,
                                     node_name=self.node_name,
                                     func=self.func,
-                                    table_desc=self.table_desc,
+                                    node_desc=self.node_desc,
                                     start_i=self.start_i[i],
                                     stop_i=self.stop_i[i],
                                     chunk_size=self.chunk_size
@@ -177,27 +179,105 @@ class SMC(object):
             pool.close()
             pool.join()
             
-            del pool
+            del pool   
 
+    def _work(self, table_file_in, node_name, func,
+              node_desc, start_i, stop_i, chunk_size):
+        ''' Defines the work per worker.
+
+        Reads data, applies the function and stores data in chunks into a table
+        or a histogram.
+        '''
+
+        with tb.open_file(table_file_in, 'r') as in_file:
+            node = in_file.get_node(in_file.root, node_name)
+
+            output_file = tempfile.NamedTemporaryFile(delete=False)
+            with tb.open_file(output_file.name, 'w') as out_file:
+                # Create result table with specified data format
+                if 'description' in node_desc:
+                    table_out = out_file.create_table(out_file.root,
+                                                      **node_desc)
+                else:  # Data format unknown
+                    table_out = None
+                # Create result histogram
+                hist_out = None
+
+                for data, _ in self._chunks_aligned_at_events(table=node,
+                                                             start_index=start_i,
+                                                             stop_index=stop_i,
+                                                             chunk_size=chunk_size):
+
+                    data_ret = func(data)
+                    # Create table if not existing
+                    # Extract data type from returned data
+                    if not table_out:
+                        if data_ret.dtype.names:  # Recarray thus table needed
+                            table_out = out_file.create_table(out_file.root,
+                                                              description=data_ret.dtype,
+                                                              **node_desc)
+                        # Create histogram if data is not a table
+                        else:
+                            hist_out = data_ret
+                            continue
+                            
+                    if table_out is not None: 
+                        table_out.append(data_ret)  # Tables are appended
+                    else:
+                        hist_out += data_ret
+
+                if hist_out is not None:
+                    # Store histogram to file
+                    out = out_file.create_carray(out_file.root, 
+                                         atom=tb.Atom.from_dtype(hist_out.dtype),
+                                         shape=hist_out.shape,
+                                         **node_desc)
+                    out[:] = hist_out
+
+        return output_file.name
+    
     def _combine(self):
-        # Use first tmp file as result file
-        os.rename(self.tmp_files[0], self.table_file_out)
-        # Output node name set to input node name
-        node_name = self.node_name
         # Try to set output node name if defined
         try:
-            node_name = self.table_desc['name']
+            node_name = self.node_desc['name']
         except KeyError:
-            pass
+            # Output node name set to input node name
+            node_name = self.node_name
 
-        with tb.open_file(self.table_file_out, 'r+') as out_file:
-            node = out_file.get_node(out_file.root, node_name)
-            for f in self.tmp_files[1:]:
-                with tb.open_file(f) as in_file:
-                    tmp_node = in_file.get_node(in_file.root, node_name)
-                    for i in range(0, tmp_node.shape[0], self.chunk_size):
-                        node.append(tmp_node[i: i + self.chunk_size])
-
+        # Check data type to decide on combine procedure
+        data_type = 'table'
+        with tb.open_file(self.tmp_files[0], 'r') as in_file:
+            node = in_file.get_node(in_file.root, node_name)
+            if type(node) is tb.carray.CArray:
+                data_type = 'array'
+        
+        if data_type == 'table':
+            # Use first tmp file as result file
+            shutil.move(self.tmp_files[0], self.file_out)
+            
+            with tb.open_file(self.file_out, 'r+') as out_file:
+                node = out_file.get_node(out_file.root, node_name)
+                for f in self.tmp_files[1:]:
+                    with tb.open_file(f) as in_file:
+                        tmp_node = in_file.get_node(in_file.root, node_name)
+                        for i in range(0, tmp_node.shape[0], self.chunk_size):
+                            node.append(tmp_node[i: i + self.chunk_size])
+        else:  # TODO: solution without having all hists in RAM
+            with tb.open_file(self.file_out, 'w') as out_file:
+                hist_data = None
+                for f in self.tmp_files:
+                    with tb.open_file(f) as in_file:
+                        tmp_node = in_file.get_node(in_file.root, node_name)
+                        if hist_data is None:
+                            hist_data = tmp_node[:]
+                        else:
+                            hist_data += tmp_node[:]
+                out = out_file.create_carray(out_file.root, 
+                                         atom=tb.Atom.from_dtype(hist_data.dtype),
+                                         shape=hist_data.shape,
+                                         **self.node_desc)
+                out[:] = hist_data
+    
     def _get_split_indeces(self):
         ''' Calculates the data for each core.
 
@@ -238,42 +318,7 @@ class SMC(object):
 
         return next_indeces
 
-    def _work(self, table_file_in, node_name, func,
-              table_desc, start_i, stop_i, chunk_size):
-        ''' Defines the work per worker.
-
-        Reads data, applies the function and stores data in chunks into a table.
-        '''
-
-        with tb.open_file(table_file_in, 'r') as in_file:
-            node = in_file.get_node(in_file.root, node_name)
-
-            output_file = tempfile.NamedTemporaryFile(delete=False)
-            with tb.open_file(output_file.name, 'w') as out_file:
-                # Create result table with specified data format
-                if 'description' in table_desc:
-                    table_out = out_file.create_table(out_file.root,
-                                                      **table_desc)
-                else:  # Data format unknown
-                    table_out = None
-
-                for data, _ in self.chunks_aligned_at_events(table=node,
-                                                             start_index=start_i,
-                                                             stop_index=stop_i,
-                                                             chunk_size=chunk_size):
-
-                    data_ret = func(data)
-                    # Create table if not existing
-                    # Extract data type from returned data
-                    if not table_out:
-                        table_out = out_file.create_table(out_file.root,
-                                                          description=data_ret.dtype,
-                                                          **table_desc)
-                    table_out.append(data_ret)
-
-        return output_file.name
-
-    def chunks_aligned_at_events(self, table, start_index=None, stop_index=None, chunk_size=10000000):
+    def _chunks_aligned_at_events(self, table, start_index=None, stop_index=None, chunk_size=10000000):
         '''Takes the table with a event_number column and returns chunks with the size up to chunk_size.
         The chunks are chosen in a way that the events are not splitted.
         Start and the stop indices limiting the table size can be specified to improve performance.
@@ -374,7 +419,7 @@ if __name__ == '__main__':
         return a
 
     SMC(table_file_in=r'../examples/data/TestBeamData_FEI4_DUT0.h5',
-        table_file_out=r'tets.h5',
+        file_out=r'tets.h5',
         func=f, align_at='event_number',
         n_cores=1,
         chunk_size=1000)
