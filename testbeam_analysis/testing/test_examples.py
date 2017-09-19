@@ -75,7 +75,8 @@ class TestExamples(unittest.TestCase):
         # CI environments
         try:
             cls.examples_fei4_hit_files = [analysis_utils.get_data(path='examples/TestBeamData_FEI4_DUT%d.h5' % i,
-                                                                   output=os.path.join(testing_path, 'examples/TestBeamData_FEI4_DUT%d.h5' % i),
+                                                                   output=os.path.join(testing_path,
+                                                                                       'examples/TestBeamData_FEI4_DUT%d.h5' % i),
                                                                    fail_on_overwrite=True)
                                                                    for i in [0, 1, 4, 5]]
             data_selection.reduce_hit_files(cls.examples_fei4_hit_files,
@@ -86,7 +87,7 @@ class TestExamples(unittest.TestCase):
                 os.rename(os.path.splitext(file_name)[0] + '_reduced.h5',
                           file_name)
         except RuntimeError: # Files are already downloaded and reduced
-            cls.examples_fei4_hit_files = [os.path.join('examples', 'TestBeamData_FEI4_DUT%d.h5' % i)
+            cls.examples_fei4_hit_files = [os.path.join(testing_path, 'examples/TestBeamData_FEI4_DUT%d.h5' % i)
                                            for i in [0, 1, 4, 5]]
         try:
             cls.examples_mimosa_hit_files = [analysis_utils.get_data(path='examples/TestBeamData_Mimosa26_DUT%d.h5' % i,
@@ -101,7 +102,7 @@ class TestExamples(unittest.TestCase):
                 os.rename(os.path.splitext(file_name)[0] + '_reduced.h5',
                           file_name)
         except RuntimeError: # Files are already downloaded and reduced
-            cls.examples_mimosa_hit_files = [os.path.join('examples', 'TestBeamData_Mimosa26_DUT%d.h5' % i)
+            cls.examples_mimosa_hit_files = [os.path.join(testing_path, 'examples/TestBeamData_Mimosa26_DUT%d.h5' % i)
                                            for i in range(6)]
 
     # Alignments do not converge for reduced data set
