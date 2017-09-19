@@ -5,6 +5,7 @@
 import os
 import unittest
 import mock
+import logging
 from shutil import copyfile
 import tables as tb
 
@@ -16,8 +17,11 @@ from testbeam_analysis.examples import (eutelescope,
                                         fei4_telescope,
                                         simulated_data)
 
+testing_path = os.path.dirname(__file__)
 
-def copy_data(path, out_path, **kwarg):
+
+def copy_data(path, out_path):
+    logging.error('COPY %s %s', path, out_path)
     test_tools.create_folder(os.path.dirname(out_path))
     copyfile(path, out_path)
 
@@ -71,6 +75,7 @@ class TestExamples(unittest.TestCase):
         # CI environments
         try:
             cls.examples_fei4_hit_files = [analysis_utils.get_data(path='examples/TestBeamData_FEI4_DUT%d.h5' % i,
+                                                                   output=os.path.join(testing_path, 'examples/TestBeamData_FEI4_DUT%d.h5' % i),
                                                                    fail_on_overwrite=True)
                                                                    for i in [0, 1, 4, 5]]
             data_selection.reduce_hit_files(cls.examples_fei4_hit_files,
@@ -85,6 +90,7 @@ class TestExamples(unittest.TestCase):
                                            for i in [0, 1, 4, 5]]
         try:
             cls.examples_mimosa_hit_files = [analysis_utils.get_data(path='examples/TestBeamData_Mimosa26_DUT%d.h5' % i,
+                                                                     output=os.path.join(testing_path, 'examples/TestBeamData_Mimosa26_DUT%d.h5' % i),
                                                                    fail_on_overwrite=True)
                                                                    for i in range(6)]
             data_selection.reduce_hit_files(cls.examples_mimosa_hit_files,
@@ -102,8 +108,9 @@ class TestExamples(unittest.TestCase):
     # Thus mock out the alignment steps
     @mock.patch('testbeam_analysis.dut_alignment.prealignment',
                 side_effect=copy_data(
-                    path=analysis_utils.get_data(path='fixtures/examples/eutelescope/Alignment.h5'),
-                    out_path=r'examples/output_eutel/Alignment.h5')
+                    path=analysis_utils.get_data(path='fixtures/examples/eutelescope/Alignment.h5',
+                                                 output=os.path.join(testing_path, 'fixtures/examples/eutelescope/Alignment.h5')),
+                    out_path=os.path.join(testing_path, 'examples/output_eutel/Alignment.h5'))
                 )
     @mock.patch('testbeam_analysis.dut_alignment.alignment')
     # TODO: Analysis fails, to be checked why
@@ -117,8 +124,9 @@ class TestExamples(unittest.TestCase):
     # Thus mock out the prealignment
     @mock.patch('testbeam_analysis.dut_alignment.prealignment',
                 side_effect=copy_data(
-                    path=analysis_utils.get_data(path='fixtures/examples/fei4_telescope/Alignment.h5'),
-                    out_path=r'examples/output_fei4/Alignment.h5')
+                    path=analysis_utils.get_data(path='fixtures/examples/fei4_telescope/Alignment.h5',
+                                                 output=os.path.join(testing_path, 'fixtures/examples/fei4_telescope/Alignment.h5')),
+                    out_path=os.path.join(testing_path, 'examples/output_fei4/Alignment.h5'))
                 )
     def test_fei4_example(self, mock):
         fei4_telescope.run_analysis(self.examples_fei4_hit_files)

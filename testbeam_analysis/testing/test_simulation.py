@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 
 from testbeam_analysis.tools import simulate_data, geometry_utils, analysis_utils, test_tools
 
+testing_path = os.path.dirname(__file__)
+
 
 class TestHitAnalysis(unittest.TestCase):
 
@@ -456,7 +458,8 @@ class TestHitAnalysis(unittest.TestCase):
 
         for dut_index in range(self.simulate_data.n_duts):
             data_equal, error_msg = test_tools.compare_h5_files('simulated_data_DUT%d.h5' % dut_index,
-                                                                analysis_utils.get_data('fixtures/simulation/simulated_data_DUT%d.h5' % dut_index),
+                                                                analysis_utils.get_data('fixtures/simulation/simulated_data_DUT%d.h5' % dut_index,
+                                                                                        output=os.path.join(testing_path, 'fixtures/simulation/simulated_data_DUT%d.h5' % dut_index)),
                                                                 exact=False)
             self.assertTrue(data_equal, msg=error_msg)
 

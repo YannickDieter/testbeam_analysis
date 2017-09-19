@@ -7,6 +7,9 @@ import unittest
 from testbeam_analysis import result_analysis
 from testbeam_analysis.tools import analysis_utils, test_tools
 
+testing_path = os.path.dirname(__file__)
+
+
 class TestResultAnalysis(unittest.TestCase):
 
     @classmethod
@@ -15,7 +18,7 @@ class TestResultAnalysis(unittest.TestCase):
             from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
-        cls.output_folder = 'test_res_output'
+        cls.output_folder = 'tmp_test_res_output'
         test_tools.create_folder(cls.output_folder)
         cls.pixel_size = [250, 50] * 4  # in um
         cls.n_pixels = [80, 336] * 4
@@ -23,8 +26,7 @@ class TestResultAnalysis(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):  # remove created files
-        pass
-        #shutil.rmtree(cls.output_folder)
+        shutil.rmtree(cls.output_folder)
 
     @unittest.SkipTest
     def test_residuals_calculation(self):
