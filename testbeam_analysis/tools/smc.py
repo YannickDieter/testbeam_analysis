@@ -291,7 +291,7 @@ class SMC(object):
         '''
 
         core_chunk_size = self.n_rows // self.n_cores
-        start_indeces = range(0, self.n_rows, core_chunk_size)[:self.n_cores]
+        start_indeces = list(range(0, self.n_rows, core_chunk_size)[:self.n_cores])
 
         if not self.align_at:
             stop_indeces = start_indeces[1:]
