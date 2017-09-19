@@ -78,7 +78,6 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
 
     def work(tracklets_data_chunk):
         ''' Track finding per cpu core '''
-        import numpy as np
         # Prepare hit data for track finding, create temporary arrays for x, y, z position and charge data
         # This is needed to call a numba jitted function, since the number of DUTs is not fixed and thus the data format
         x = tracklets_data_chunk['x_dut_0']
