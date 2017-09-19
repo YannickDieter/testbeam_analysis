@@ -287,9 +287,9 @@
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">records</span><span class="o">.</span><span class="n">fromarrays</span><span class="p">(</span><span class="n">combined</span><span class="o">.</span><span class="n">transpose</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">tracklets_data_chunk</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
     
     <span class="n">smc</span><span class="o">.</span><span class="n">SMC</span><span class="p">(</span><span class="n">table_file_in</span><span class="o">=</span><span class="n">input_tracklets_file</span><span class="p">,</span>
-            <span class="n">table_file_out</span><span class="o">=</span><span class="n">output_track_candidates_file</span><span class="p">,</span>
+            <span class="n">file_out</span><span class="o">=</span><span class="n">output_track_candidates_file</span><span class="p">,</span>
             <span class="n">func</span><span class="o">=</span><span class="n">work</span><span class="p">,</span>
-            <span class="n">table_desc</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span><span class="s1">&#39;TrackCandidates&#39;</span><span class="p">,</span>
+            <span class="n">node_desc</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span><span class="s1">&#39;TrackCandidates&#39;</span><span class="p">,</span>
                         <span class="s1">&#39;title&#39;</span><span class="p">:</span><span class="s1">&#39;Track candidates&#39;</span><span class="p">},</span>
             <span class="c1"># Apply track finding on tracklets or track candidates</span>
             <span class="n">table</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Tracklets&#39;</span><span class="p">,</span> <span class="s1">&#39;TrackCandidates&#39;</span><span class="p">],</span>
