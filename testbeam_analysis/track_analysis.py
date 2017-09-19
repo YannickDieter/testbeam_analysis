@@ -123,9 +123,9 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
         return np.core.records.fromarrays(combined.transpose(), dtype=tracklets_data_chunk.dtype)
     
     smc.SMC(table_file_in=input_tracklets_file,
-            table_file_out=output_track_candidates_file,
+            file_out=output_track_candidates_file,
             func=work,
-            table_desc={'name':'TrackCandidates',
+            node_desc={'name':'TrackCandidates',
                         'title':'Track candidates'},
             # Apply track finding on tracklets or track candidates
             table=['Tracklets', 'TrackCandidates'],
