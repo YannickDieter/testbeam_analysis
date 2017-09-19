@@ -122,7 +122,7 @@ def check_file(input_hits_file, n_pixel, output_check_file=None,
         plot_utils.plot_checks(input_corr_file=output_check_file)
 
 
-def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMask", output_mask_file=None, pixel_size=None, threshold=10.0, filter_size=3, dut_name=None, plot=True, chunk_size=1000000):
+def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMask", output_mask_file=None, pixel_size=None, threshold=10.0, filter_size=3, dut_name=None, plot=True, chunk_size=10000000):
     '''Generating pixel mask from the hit table.
 
     Parameters
@@ -252,20 +252,18 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
         clusters[cluster_index].err_rows = max_row - min_row + 1
 
     with tb.open_file(input_hits_file, 'r') as input_file_h5:
-        with tb.open_file(output_cluster_file, 'w') as output_file_h5:
-            if input_disabled_pixel_mask_file is not None:
+        if input_disabled_pixel_mask_file is not None:
                 with tb.open_file(input_disabled_pixel_mask_file, 'r') as input_mask_file_h5:
                     disabled_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.DisabledPixelMask[:]))[0] + 1
-                    input_mask_file_h5.root.DisabledPixelMask._f_copy(newparent=output_file_h5.root)
-            else:
-                disabled_pixels = None
-            if input_noisy_pixel_mask_file is not None:
-                with tb.open_file(input_noisy_pixel_mask_file, 'r') as input_mask_file_h5:
-                    noisy_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.NoisyPixelMask[:]))[0] + 1
-                    input_mask_file_h5.root.NoisyPixelMask._f_copy(newparent=output_file_h5.root)
-            else:
-                noisy_pixels = None
-
+        else:
+            disabled_pixels = None
+        if input_noisy_pixel_mask_file is not None:
+            with tb.open_file(input_noisy_pixel_mask_file, 'r') as input_mask_file_h5:
+                noisy_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.NoisyPixelMask[:]))[0] + 1
+        else:
+            noisy_pixels = None
+        
+        with tb.open_file(output_cluster_file, 'w') as output_file_h5:
             clusterizer = HitClusterizer(column_cluster_distance=column_cluster_distance, row_cluster_distance=row_cluster_distance, frame_cluster_distance=frame_cluster_distance, min_hit_charge=min_hit_charge, max_hit_charge=max_hit_charge)
             clusterizer.add_cluster_field(description=('err_cols', '<f4'))  # Add an additional field to hold the cluster size in x
             clusterizer.add_cluster_field(description=('err_rows', '<f4'))  # Add an additional field to hold the cluster size in y
@@ -289,6 +287,14 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
                 if create_cluster_hits_table:
                     cluster_hits_table.append(cluster_hits)
                 cluster_table.append(clusters)
+                
+            # Copy nodes to result file
+            if input_disabled_pixel_mask_file is not None:
+                with tb.open_file(input_disabled_pixel_mask_file, 'r') as input_mask_file_h5:
+                    input_mask_file_h5.root.DisabledPixelMask._f_copy(newparent=output_file_h5.root)
+            if input_noisy_pixel_mask_file is not None:
+                with tb.open_file(input_noisy_pixel_mask_file, 'r') as input_mask_file_h5:
+                    input_mask_file_h5.root.NoisyPixelMask._f_copy(newparent=output_file_h5.root)
 
     def get_eff_pitch(hist, cluster_size):
         ''' Effective pitch to describe the cluster
