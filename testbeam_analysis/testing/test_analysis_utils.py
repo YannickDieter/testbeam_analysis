@@ -10,13 +10,6 @@ import numpy as np
 from testbeam_analysis.cpp import data_struct
 from testbeam_analysis.tools import analysis_utils, test_tools
 
-# Get package path
-testing_path = os.path.dirname(__file__)  # Get the absoulte path of the online_monitor installation
-
-test_tools.install_quilt_data(package='DavidLP/tba_fixtures',
-                              hash='ecc02538576cb905044222270674ef57e21e44c67d6bab36d4c0eb6ce08f4e66')
-from quilt.data.DavidLP import tba_fixtures
-
 
 class TestAnalysisUtils(unittest.TestCase):
 
@@ -120,7 +113,7 @@ class TestAnalysisUtils(unittest.TestCase):
         self.assertTrue(exception_ok & np.all(array == array_fast))
 
     def test_3d_index_histograming(self):  # check compiled hist_3D_index function
-        with tb.open_file(test_tools.get_quilt_data(tba_fixtures.analysis_utils, 'hist_data'), mode="r") as in_file_h5:
+        with tb.open_file(analysis_utils.get_data(r'fixtures/analysis_utils/hist_data.h5'), mode="r") as in_file_h5:
             xyz = in_file_h5.root.HistDataXYZ[:]
             x, y, z = xyz[0], xyz[1], xyz[2]
             shape = (100, 100, 100)
