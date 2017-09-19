@@ -75,19 +75,15 @@ def run_analysis(data_files):
     # seperate function in correct order
 
     # Generate noisy pixel mask
-    # A pool of workers to remove the noisy pixels for all files in parallel
-    kwargs = [{
-        'input_hits_file': data_files[i],
-        'n_pixel': n_pixels[i],
-        'pixel_mask_name': "NoisyPixelMask",
-        'pixel_size': pixel_size[i],
-        'threshold': 0.5,
-        'dut_name': dut_names[i]} for i in range(len(data_files))]
-    pool = Pool()
-    for kwarg in kwargs:
-        pool.apply_async(hit_analysis.generate_pixel_mask, kwds=kwarg)
-    pool.close()
-    pool.join()
+    for i, data_file in enumerate(data_files):
+        hit_analysis.generate_pixel_mask(input_hits_file=data_file,
+                                         n_pixel=n_pixels[i],
+                                         pixel_mask_name='NoisyPixelMask',
+                                         pixel_size=pixel_size[i],
+                                         threshold=0.5,
+                                         dut_name=dut_names[i])
+    
+    raise
 
     # Cluster hits from all DUTs
     # A pool of workers to cluster hits for all files in parallel
