@@ -242,7 +242,6 @@
 
     <span class="k">def</span> <span class="nf">work</span><span class="p">(</span><span class="n">tracklets_data_chunk</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Track finding per cpu core &#39;&#39;&#39;</span>
-        <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
         <span class="c1"># Prepare hit data for track finding, create temporary arrays for x, y, z position and charge data</span>
         <span class="c1"># This is needed to call a numba jitted function, since the number of DUTs is not fixed and thus the data format</span>
         <span class="n">x</span> <span class="o">=</span> <span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;x_dut_0&#39;</span><span class="p">]</span>
