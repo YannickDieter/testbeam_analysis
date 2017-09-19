@@ -228,3 +228,12 @@ def check_with_fixture(function, **kwargs):
     data = _call_function_with_args(function, **kwargs)
 
     return np.allclose(data_fixture, data)
+
+
+def create_folder(path):
+    if not os.path.exists(path):
+        try:
+            os.makedirs(path)
+        except OSError as exc:  # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
