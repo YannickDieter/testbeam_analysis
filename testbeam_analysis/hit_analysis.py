@@ -157,69 +157,35 @@ def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMas
     if output_mask_file is None:
         output_mask_file = os.path.splitext(input_hits_file)[0] + '_' + '_'.join(item.lower() for item in re.findall('[A-Z][^A-Z]*', pixel_mask_name)) + '.h5'
 
-#     # Create occupancy histogram
-#     def work(hit_chunk):
-#         col, row = hit_chunk['column'], hit_chunk['row']
-#         return analysis_utils.hist_2d_index(col - 1, row - 1, shape=n_pixel)
-#                  
-#     smc.SMC(table_file_in=input_hits_file,
-#         file_out=output_mask_file,
-#         func=work,
-#         node_desc={'name':'HistOcc'},
-#         n_cores=1,
-#         chunk_size=chunk_size)
-#  
-#     # Create mask from occupancy histogram
-#     with tb.open_file(output_mask_file, 'r+') as out_file_h5:
-#         occupancy = out_file_h5.root.HistOcc[:]
-#         # Run median filter across data, assuming 0 filling past the edges to get expected occupancy
-#         blurred = median_filter(occupancy.astype(np.int32), size=filter_size, mode='constant', cval=0.0)
-#         # Spot noisy pixels maxima by substracting expected occupancy
-#         difference = np.ma.masked_array(occupancy - blurred)
-#         std = np.ma.std(difference)
-#         abs_occ_threshold = threshold * std
-#         occupancy = np.ma.masked_where(difference > abs_occ_threshold, occupancy)
-#         logging.info('Masked %d pixels at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_hits_file)
-#         # Generate tuple col / row array of hot pixels, do not use getmask()
-#         pixel_mask = np.ma.getmaskarray(occupancy)
-#  
-#         # Create masked pixels array
-#         masked_pixel_table = out_file_h5.create_carray(out_file_h5.root, name=pixel_mask_name, title='Pixel Mask', atom=tb.Atom.from_dtype(pixel_mask.dtype), shape=pixel_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-#         masked_pixel_table[:] = pixel_mask
-#        
-#     if plot:
-#         plot_masked_pixels(input_mask_file=output_mask_file, pixel_size=pixel_size, dut_name=dut_name)
-    occupancy = None
-    # Calculating occupancy array
-    with tb.open_file(input_hits_file, 'r') as input_file_h5:
-        for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
-            col, row = hits['column'], hits['row']
-            chunk_occ = analysis_utils.hist_2d_index(col - 1, row - 1, shape=n_pixel)
-            if occupancy is None:
-                occupancy = chunk_occ
-            else:
-                occupancy = occupancy + chunk_occ
- 
-    # Run median filter across data, assuming 0 filling past the edges to get expected occupancy
-    blurred = median_filter(occupancy.astype(np.int32), size=filter_size, mode='constant', cval=0.0)
-    # Spot noisy pixels maxima by substracting expected occupancy
-    difference = np.ma.masked_array(occupancy - blurred)
-    std = np.ma.std(difference)
-    abs_occ_threshold = threshold * std
-    occupancy = np.ma.masked_where(difference > abs_occ_threshold, occupancy)
-    logging.info('Masked %d pixels at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_hits_file)
-    # Generate tuple col / row array of hot pixels, do not use getmask()
-    pixel_mask = np.ma.getmaskarray(occupancy)
- 
-    with tb.open_file(output_mask_file, 'w') as out_file_h5:
-        # Create occupancy array without masking pixels
-        occupancy_array_table = out_file_h5.create_carray(out_file_h5.root, name='HistOcc', title='Occupancy Histogram', atom=tb.Atom.from_dtype(occupancy.dtype), shape=occupancy.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-        occupancy_array_table[:] = np.ma.getdata(occupancy)
- 
+    # Create occupancy histogram
+    def work(hit_chunk):
+        col, row = hit_chunk['column'], hit_chunk['row']
+        return analysis_utils.hist_2d_index(col - 1, row - 1, shape=n_pixel)
+                   
+    smc.SMC(table_file_in=input_hits_file,
+        file_out=output_mask_file,
+        func=work,
+        node_desc={'name':'HistOcc'},
+        chunk_size=chunk_size)
+   
+    # Create mask from occupancy histogram
+    with tb.open_file(output_mask_file, 'r+') as out_file_h5:
+        occupancy = out_file_h5.root.HistOcc[:]
+        # Run median filter across data, assuming 0 filling past the edges to get expected occupancy
+        blurred = median_filter(occupancy.astype(np.int32), size=filter_size, mode='constant', cval=0.0)
+        # Spot noisy pixels maxima by substracting expected occupancy
+        difference = np.ma.masked_array(occupancy - blurred)
+        std = np.ma.std(difference)
+        abs_occ_threshold = threshold * std
+        occupancy = np.ma.masked_where(difference > abs_occ_threshold, occupancy)
+        logging.info('Masked %d pixels at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_hits_file)
+        # Generate tuple col / row array of hot pixels, do not use getmask()
+        pixel_mask = np.ma.getmaskarray(occupancy)
+   
         # Create masked pixels array
         masked_pixel_table = out_file_h5.create_carray(out_file_h5.root, name=pixel_mask_name, title='Pixel Mask', atom=tb.Atom.from_dtype(pixel_mask.dtype), shape=pixel_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
         masked_pixel_table[:] = pixel_mask
- 
+         
     if plot:
         plot_masked_pixels(input_mask_file=output_mask_file, pixel_size=pixel_size, dut_name=dut_name)
 
