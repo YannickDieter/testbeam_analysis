@@ -292,16 +292,6 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
             align_at='event_number',
             chunk_size=chunk_size)
 
-    # Copy masks to result cluster file
-    with tb.open_file(output_cluster_file, 'r+') as output_file_h5:
-        # Copy nodes to result file
-        if input_disabled_pixel_mask_file is not None:
-            with tb.open_file(input_disabled_pixel_mask_file, 'r') as input_mask_file_h5:
-                input_mask_file_h5.root.DisabledPixelMask._f_copy(newparent=output_file_h5.root)
-        if input_noisy_pixel_mask_file is not None:
-            with tb.open_file(input_noisy_pixel_mask_file, 'r') as input_mask_file_h5:
-                input_mask_file_h5.root.NoisyPixelMask._f_copy(newparent=output_file_h5.root)
-
     # Calculate cluster size histogram
     def hist_func(cluster):
         n_hits = cluster['n_hits']
@@ -322,7 +312,7 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
         n_hits = (hight * np.arange(0, hight.shape[0])).sum()
         max_cluster_size = hight.shape[0] - 1
 
-    # Calculate position error from cluster size 
+    # Calculate position error from cluster size
     def get_eff_pitch(hist, cluster_size):
         ''' Effective pitch to describe the cluster
             size propability distribution
@@ -355,6 +345,16 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
             file_out=output_cluster_file,
             func=pos_error_func,
             chunk_size=chunk_size)
+
+    # Copy masks to result cluster file
+    with tb.open_file(output_cluster_file, 'r+') as output_file_h5:
+        # Copy nodes to result file
+        if input_disabled_pixel_mask_file is not None:
+            with tb.open_file(input_disabled_pixel_mask_file, 'r') as input_mask_file_h5:
+                input_mask_file_h5.root.DisabledPixelMask._f_copy(newparent=output_file_h5.root)
+        if input_noisy_pixel_mask_file is not None:
+            with tb.open_file(input_noisy_pixel_mask_file, 'r') as input_mask_file_h5:
+                input_mask_file_h5.root.NoisyPixelMask._f_copy(newparent=output_file_h5.root)
 
     if plot:
         plot_cluster_size(hight, n_hits, n_clusters, max_cluster_size,
