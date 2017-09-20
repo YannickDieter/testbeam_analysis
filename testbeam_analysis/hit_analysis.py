@@ -161,13 +161,13 @@ def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMas
     def work(hit_chunk):
         col, row = hit_chunk['column'], hit_chunk['row']
         return analysis_utils.hist_2d_index(col - 1, row - 1, shape=n_pixel)
-                   
+
     smc.SMC(table_file_in=input_hits_file,
-        file_out=output_mask_file,
-        func=work,
-        node_desc={'name':'HistOcc'},
-        chunk_size=chunk_size)
-   
+            file_out=output_mask_file,
+            func=work,
+            node_desc={'name': 'HistOcc'},
+            chunk_size=chunk_size)
+
     # Create mask from occupancy histogram
     with tb.open_file(output_mask_file, 'r+') as out_file_h5:
         occupancy = out_file_h5.root.HistOcc[:]
@@ -181,18 +181,18 @@ def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMas
         logging.info('Masked %d pixels at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_hits_file)
         # Generate tuple col / row array of hot pixels, do not use getmask()
         pixel_mask = np.ma.getmaskarray(occupancy)
-   
+
         # Create masked pixels array
         masked_pixel_table = out_file_h5.create_carray(out_file_h5.root, name=pixel_mask_name, title='Pixel Mask', atom=tb.Atom.from_dtype(pixel_mask.dtype), shape=pixel_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
         masked_pixel_table[:] = pixel_mask
-         
+
     if plot:
         plot_masked_pixels(input_mask_file=output_mask_file, pixel_size=pixel_size, dut_name=dut_name)
 
     return output_mask_file
 
 
-def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_table=False, input_disabled_pixel_mask_file=None, input_noisy_pixel_mask_file=None, min_hit_charge=0, max_hit_charge=None, column_cluster_distance=1, row_cluster_distance=1, frame_cluster_distance=1, dut_name=None, plot=True, chunk_size=1000000):
+def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel_mask_file=None, input_noisy_pixel_mask_file=None, min_hit_charge=0, max_hit_charge=None, column_cluster_distance=1, row_cluster_distance=1, frame_cluster_distance=1, dut_name=None, plot=True, chunk_size=1000000):
     '''Clusters the hits in the data file containing the hit table.
 
     Parameters
@@ -201,8 +201,6 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
         Filename of the input hits file.
     output_cluster_file : string
         Filename of the output cluster file. If None, the filename will be derived from the input hits file.
-    create_cluster_hits_table : bool
-        If True, additionally create cluster hits table.
     input_disabled_pixel_mask_file : string
         Filename of the input disabled mask file.
     input_noisy_pixel_mask_file : string
@@ -229,10 +227,27 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
     if output_cluster_file is None:
         output_cluster_file = os.path.splitext(input_hits_file)[0] + '_clustered.h5'
 
-    # Calculate the size in col/row for each cluster
-    # This is a end of cluster function automatically
-    # called when a cluster is finished
-    def calc_cluster_dimensions(hits, clusters, cluster_size, cluster_hit_indices, cluster_index, cluster_id, charge_correction, noisy_pixels, disabled_pixels, seed_hit_index):
+    # Get noisy and disabled pixel, they are excluded for clusters
+    with tb.open_file(input_hits_file, 'r') as input_file_h5:
+        if input_disabled_pixel_mask_file is not None:
+            with tb.open_file(input_disabled_pixel_mask_file, 'r') as input_mask_file_h5:
+                disabled_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.DisabledPixelMask[:]))[0] + 1
+        else:
+            disabled_pixels = None
+        if input_noisy_pixel_mask_file is not None:
+            with tb.open_file(input_noisy_pixel_mask_file, 'r') as input_mask_file_h5:
+                noisy_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.NoisyPixelMask[:]))[0] + 1
+        else:
+            noisy_pixels = None
+
+    # Prepare clusterizer
+
+    # Define end of cluster function to
+    # calculate the size in col/row for each cluster
+    def calc_cluster_dimensions(hits, clusters, cluster_size,
+                                cluster_hit_indices, cluster_index, cluster_id,
+                                charge_correction, noisy_pixels, disabled_pixels,
+                                seed_hit_index):
         min_col = hits[cluster_hit_indices[0]].column
         max_col = hits[cluster_hit_indices[0]].column
         min_row = hits[cluster_hit_indices[0]].row
@@ -250,62 +265,42 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
                 max_row = hits[i].row
         clusters[cluster_index].err_cols = max_col - min_col + 1
         clusters[cluster_index].err_rows = max_row - min_row + 1
+    # Create clusterizer object with parameters
+    clz = HitClusterizer(column_cluster_distance=column_cluster_distance,
+                         row_cluster_distance=row_cluster_distance,
+                         frame_cluster_distance=frame_cluster_distance,
+                         min_hit_charge=min_hit_charge,
+                         max_hit_charge=max_hit_charge)
+    # Add an additional fields to hold the cluster size in x/y
+    clz.add_cluster_field(description=('err_cols', '<f4'))
+    clz.add_cluster_field(description=('err_rows', '<f4'))
+    # Set the new function to the clusterizer
+    clz.set_end_of_cluster_function(calc_cluster_dimensions)
 
-    with tb.open_file(input_hits_file, 'r') as input_file_h5:
+    # Run clusterizer on hit table in parallel on all cores
+    def work(hits, clz):
+        cl_hits, cl = clz.cluster_hits(hits,
+                                       noisy_pixels=noisy_pixels,
+                                       disabled_pixels=disabled_pixels)
+        return cl
+
+    smc.SMC(table_file_in=input_hits_file,
+            file_out=output_cluster_file,
+            func=work,
+            func_kwargs={'clz': clz},
+            node_desc={'name': 'Cluster'},
+            align_at='event_number',
+            chunk_size=chunk_size)
+
+    # Copy masks to result cluster file
+    with tb.open_file(output_cluster_file, 'r+') as output_file_h5:
+        # Copy nodes to result file
         if input_disabled_pixel_mask_file is not None:
-                with tb.open_file(input_disabled_pixel_mask_file, 'r') as input_mask_file_h5:
-                    disabled_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.DisabledPixelMask[:]))[0] + 1
-        else:
-            disabled_pixels = None
+            with tb.open_file(input_disabled_pixel_mask_file, 'r') as input_mask_file_h5:
+                input_mask_file_h5.root.DisabledPixelMask._f_copy(newparent=output_file_h5.root)
         if input_noisy_pixel_mask_file is not None:
             with tb.open_file(input_noisy_pixel_mask_file, 'r') as input_mask_file_h5:
-                noisy_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.NoisyPixelMask[:]))[0] + 1
-        else:
-            noisy_pixels = None
-        
-        with tb.open_file(output_cluster_file, 'w') as output_file_h5:
-            clusterizer = HitClusterizer(column_cluster_distance=column_cluster_distance, row_cluster_distance=row_cluster_distance, frame_cluster_distance=frame_cluster_distance, min_hit_charge=min_hit_charge, max_hit_charge=max_hit_charge)
-            clusterizer.add_cluster_field(description=('err_cols', '<f4'))  # Add an additional field to hold the cluster size in x
-            clusterizer.add_cluster_field(description=('err_rows', '<f4'))  # Add an additional field to hold the cluster size in y
-            clusterizer.set_end_of_cluster_function(calc_cluster_dimensions)  # Set the new function to the clusterizer
-
-            cluster_hits_table = None
-            cluster_table = None
-            for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
-                if not np.all(np.diff(hits['event_number']) >= 0):
-                    raise RuntimeError('The event number does not always increase. The hits cannot be used like this!')
-                cluster_hits, clusters = clusterizer.cluster_hits(hits, noisy_pixels=noisy_pixels, disabled_pixels=disabled_pixels)  # Cluster hits
-                if not np.all(np.diff(clusters['event_number']) >= 0):
-                    raise RuntimeError('The event number does not always increase. The cluster cannot be used like this!')
-                # create cluster hits table dynamically
-                if create_cluster_hits_table and cluster_hits_table is None:
-                    cluster_hits_table = output_file_h5.create_table(output_file_h5.root, name='ClusterHits', description=cluster_hits.dtype, title='Cluster hits table', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                # create cluster table dynamically
-                if cluster_table is None:
-                    cluster_table = output_file_h5.create_table(output_file_h5.root, name='Cluster', description=clusters.dtype, title='Cluster table', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-
-                if create_cluster_hits_table:
-                    cluster_hits_table.append(cluster_hits)
-                cluster_table.append(clusters)
-                
-            # Copy nodes to result file
-            if input_disabled_pixel_mask_file is not None:
-                with tb.open_file(input_disabled_pixel_mask_file, 'r') as input_mask_file_h5:
-                    input_mask_file_h5.root.DisabledPixelMask._f_copy(newparent=output_file_h5.root)
-            if input_noisy_pixel_mask_file is not None:
-                with tb.open_file(input_noisy_pixel_mask_file, 'r') as input_mask_file_h5:
-                    input_mask_file_h5.root.NoisyPixelMask._f_copy(newparent=output_file_h5.root)
-
-    def get_eff_pitch(hist, cluster_size):
-        ''' Effective pitch to describe the cluster
-            size propability distribution
-
-        hist : array like
-            Histogram with cluster size distribution
-        cluster_size : Cluster size to calculate the pitch for
-        '''
-
-        return np.sqrt(hight[int(cluster_size)].astype(np.float) / hight.sum())
+                input_mask_file_h5.root.NoisyPixelMask._f_copy(newparent=output_file_h5.root)
 
     # Calculate cluster size histogram
     with tb.open_file(output_cluster_file, 'r') as input_file_h5:
@@ -326,7 +321,18 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
                 hight += analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
             n_hits += np.sum(cluster_n_hits)
 
-    # Calculate cluster size histogram
+    def get_eff_pitch(hist, cluster_size):
+        ''' Effective pitch to describe the cluster
+            size propability distribution
+
+        hist : array like
+            Histogram with cluster size distribution
+        cluster_size : Cluster size to calculate the pitch for
+        '''
+
+        return np.sqrt(hight[int(cluster_size)].astype(np.float) / hight.sum())
+
+    # Set cluster errors
     with tb.open_file(output_cluster_file, 'r+') as io_file_h5:
         for start_index in range(0, io_file_h5.root.Cluster.nrows, chunk_size):
             clusters = io_file_h5.root.Cluster[start_index:start_index + chunk_size]
