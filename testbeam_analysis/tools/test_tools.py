@@ -124,6 +124,9 @@ def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comp
             if n_nodes != n_expected_nodes:
                 checks_passed = False
                 error_msg += 'The number of nodes in the file is wrong.\n'
+                n_f = [n.name for n in first_h5_file.root]
+                n_s = [n.name for n in second_h5_file.root]
+                error_msg += 'Expected %s\n got %s' % (str(n_f), str(n_s))
             for node in second_h5_file.root:  # loop over all nodes and compare each node, do not abort if one node is wrong
                 try:
                     expected_data = first_h5_file.get_node(first_h5_file.root, node.name)[:]
