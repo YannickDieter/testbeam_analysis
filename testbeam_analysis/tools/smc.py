@@ -1,10 +1,8 @@
 ''' Implements the often needed split, map, combine paradigm '''
 from __future__ import division
 
-import os
 import shutil
 import tempfile
-import logging
 from collections import Iterable
 from multiprocessing import Pool, cpu_count
 
@@ -77,10 +75,10 @@ class SMC(object):
             - split: data is splitted into chunks for multiple processes for
               speed increase
             - map: the function is called on each chunk. If the chunk per core
-              is still too large to fit in memory it is chunked further. The result
-              is written to a table per core.
-            - combine: the tables are merged into one result table or one result
-                        histogram depending on the output data format
+              is still too large to fit in memory it is chunked further. The
+              result is written to a table per core.
+            - combine: the tables are merged into one result table or one
+                       result histogram depending on the output data format
             '''
 
         # Set parameters
@@ -93,6 +91,10 @@ class SMC(object):
         self.chunk_size = chunk_size
         self.func_kwargs = func_kwargs
 
+        if self.align_at and self.align_at != 'event_number':
+            raise NotImplementedError('Data alignment is only supported '
+                                      'on event_number')
+
         # Get the table node name
         with tb.open_file(table_file_in) as in_file:
             if not table:  # Find the table node
@@ -101,8 +103,8 @@ class SMC(object):
                         if not table:
                             node = n
                         else:  # Multiple tables
-                            raise RuntimeError('No table node defined and'
-                                               ' multiple nodes found in file')
+                            raise RuntimeError('No table node defined and '
+                                               'multiple nodes found in file')
                 self.node_name = node.name
             elif isinstance(table, Iterable):  # possible names
                 self.node_name = None
@@ -160,31 +162,31 @@ class SMC(object):
         else:
             # Run function in parallel
             pool = Pool(self.n_cores)
-    
+
             jobs = []
             for i in range(self.n_cores):
                 job = apply_async(pool=pool,
-                                    fun=self._work,
-                                    table_file_in=self.table_file_in,
-                                    node_name=self.node_name,
-                                    func=self.func,
-                                    func_kwargs=self.func_kwargs,
-                                    node_desc=self.node_desc,
-                                    start_i=self.start_i[i],
-                                    stop_i=self.stop_i[i],
-                                    chunk_size=self.chunk_size
-                                    )
+                                  fun=self._work,
+                                  table_file_in=self.table_file_in,
+                                  node_name=self.node_name,
+                                  func=self.func,
+                                  func_kwargs=self.func_kwargs,
+                                  node_desc=self.node_desc,
+                                  start_i=self.start_i[i],
+                                  stop_i=self.stop_i[i],
+                                  chunk_size=self.chunk_size
+                                  )
                 jobs.append(job)
-    
+
             # Gather results
             self.tmp_files = []
             for job in jobs:
                 self.tmp_files.append(job.get())
-    
+
             pool.close()
             pool.join()
-            
-            del pool   
+
+            del pool
 
     def _work(self, table_file_in, node_name, func, func_kwargs,
               node_desc, start_i, stop_i, chunk_size):
@@ -208,39 +210,44 @@ class SMC(object):
                 # Create result histogram
                 hist_out = None
 
-                for data, _ in self._chunks_aligned_at_events(table=node,
-                                                             start_index=start_i,
-                                                             stop_index=stop_i,
-                                                             chunk_size=chunk_size):
+                for data, _ in self._chunks_at_event(table=node,
+                                                     start_index=start_i,
+                                                     stop_index=stop_i,
+                                                     chunk_size=chunk_size):
 
                     data_ret = func(data, **func_kwargs)
                     # Create table if not existing
                     # Extract data type from returned data
                     if not table_out:
                         if data_ret.dtype.names:  # Recarray thus table needed
+                            dcr = data_ret.dtype
                             table_out = out_file.create_table(out_file.root,
-                                                              description=data_ret.dtype,
+                                                              description=dcr,
                                                               **node_desc)
                         # Create histogram if data is not a table
                         elif hist_out is None:
                             hist_out = data_ret
                             continue
-                            
-                    if table_out is not None: 
+
+                    if table_out is not None:
                         table_out.append(data_ret)  # Tables are appended
                     else:
+#                         for i in enumerate(hist_out.shape):
+#                             np.array(data_ret.shape) > np.array(hist_out.shape)):
+
                         hist_out += data_ret
 
                 if hist_out is not None:
                     # Store histogram to file
-                    out = out_file.create_carray(out_file.root, 
-                                         atom=tb.Atom.from_dtype(hist_out.dtype),
-                                         shape=hist_out.shape,
-                                         **node_desc)
+                    dt = hist_out.dtype
+                    out = out_file.create_carray(out_file.root,
+                                                 atom=tb.Atom.from_dtype(dt),
+                                                 shape=hist_out.shape,
+                                                 **node_desc)
                     out[:] = hist_out
 
         return output_file.name
-    
+
     def _combine(self):
         # Try to set output node name if defined
         try:
@@ -255,11 +262,11 @@ class SMC(object):
             node = in_file.get_node(in_file.root, node_name)
             if type(node) is tb.carray.CArray:
                 data_type = 'array'
-        
+
         if data_type == 'table':
             # Use first tmp file as result file
             shutil.move(self.tmp_files[0], self.file_out)
-            
+
             with tb.open_file(self.file_out, 'r+') as out_file:
                 node = out_file.get_node(out_file.root, node_name)
                 for f in self.tmp_files[1:]:
@@ -277,12 +284,13 @@ class SMC(object):
                             hist_data = tmp_node[:]
                         else:
                             hist_data += tmp_node[:]
-                out = out_file.create_carray(out_file.root, 
-                                         atom=tb.Atom.from_dtype(hist_data.dtype),
-                                         shape=hist_data.shape,
-                                         **self.node_desc)
+                dt = hist_data.dtype
+                out = out_file.create_carray(out_file.root,
+                                             atom=tb.Atom.from_dtype(dt),
+                                             shape=hist_data.shape,
+                                             **self.node_desc)
                 out[:] = hist_data
-    
+
     def _get_split_indeces(self):
         ''' Calculates the data for each core.
 
@@ -291,7 +299,10 @@ class SMC(object):
         '''
 
         core_chunk_size = self.n_rows // self.n_cores
-        start_indeces = list(range(0, self.n_rows, core_chunk_size)[:self.n_cores])
+        start_indeces = list(range(0,
+                                   self.n_rows,
+                                   core_chunk_size)
+                             [:self.n_cores])
 
         if not self.align_at:
             stop_indeces = start_indeces[1:]
@@ -323,11 +334,13 @@ class SMC(object):
 
         return next_indeces
 
-    def _chunks_aligned_at_events(self, table, start_index=None, stop_index=None, chunk_size=10000000):
-        '''Takes the table with a event_number column and returns chunks with the size up to chunk_size.
+    def _chunks_at_event(self, table, start_index=None, stop_index=None,
+                         chunk_size=10000000):
+        '''Takes the table with a event_number column and returns chunks.
+
         The chunks are chosen in a way that the events are not splitted.
-        Start and the stop indices limiting the table size can be specified to improve performance.
-        The event_number column must be sorted.
+        Start and the stop indices limiting the table size can be specified to
+        improve performance. The event_number column must be sorted.
 
         Parameters
         ----------
@@ -381,51 +394,14 @@ class SMC(object):
                 last_event = event_numbers[-1]
 
                 # Search for next event number
-                chunk_stop_index = np.searchsorted(event_numbers,
-                                                   last_event,
-                                                   side="left")
+                chunk_stop_i = np.searchsorted(event_numbers,
+                                               last_event,
+                                               side="left")
 
-                yield chunk[:chunk_stop_index], current_start_index + chunk_stop_index
+                yield chunk[:chunk_stop_i], current_start_index + chunk_stop_i
 
-                current_start_index += chunk_stop_index
+                current_start_index += chunk_stop_i
 
 
 if __name__ == '__main__':
-    def f(data):
-        # It is needed to import needed modules in every pickled function
-        # It is not too clear to me what this implies
-        n_duts = 2
-        description = [('event_number', np.int64)]
-        for index in range(n_duts):
-            description.append(('x_dut_%d' % index, np.float))
-        for index in range(n_duts):
-            description.append(('y_dut_%d' % index, np.float))
-        for index in range(n_duts):
-            description.append(('z_dut_%d' % index, np.float))
-        for index in range(n_duts):
-            description.append(('charge_dut_%d' % index, np.float))
-        for index in range(n_duts):
-            description.append(('n_hits_dut_%d' % index, np.int8))
-        for dimension in range(3):
-            description.append(('offset_%d' % dimension, np.float))
-        for dimension in range(3):
-            description.append(('slope_%d' % dimension, np.float))
-        description.extend(
-            [('track_chi2', np.uint32), ('track_quality', np.uint32), ('n_tracks', np.int8)])
-        for index in range(n_duts):
-            description.append(('xerr_dut_%d' % index, np.float))
-        for index in range(n_duts):
-            description.append(('yerr_dut_%d' % index, np.float))
-        for index in range(n_duts):
-            description.append(('zerr_dut_%d' % index, np.float))
-
-        a = np.zeros(shape=(data.shape[0],), dtype=description)
-        a[:]['event_number'] = data[:]['event_number']
-        return a
-
-    SMC(table_file_in=r'../examples/data/TestBeamData_FEI4_DUT0.h5',
-        file_out=r'tets.h5',
-        func=f, align_at='event_number',
-        n_cores=1,
-        chunk_size=1000)
-
+    pass
