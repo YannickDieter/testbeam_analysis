@@ -226,15 +226,26 @@ class SMC(object):
                                                               **node_desc)
                         # Create histogram if data is not a table
                         elif hist_out is None:
-                            hist_out = data_ret
+                            # Copy needed for reshape
+                            hist_out = data_ret.copy()
                             continue
 
                     if table_out is not None:
                         table_out.append(data_ret)  # Tables are appended
                     else:
-#                         for i in enumerate(hist_out.shape):
-#                             np.array(data_ret.shape) > np.array(hist_out.shape)):
+                        # Check if array needs to be enlarged
+                        shape = []
+                        # Loop over dimension
+                        for i in range(len(hist_out.shape)):
+                            if hist_out.shape[i] < data_ret.shape[i]:
+                                shape.append(data_ret.shape[i])
+                            else:
+                                shape.append(hist_out.shape[i])
 
+                        hist_out.resize(shape)
+
+                        # Add array, ignore size
+                        data_ret.resize(hist_out.shape)
                         hist_out += data_ret
 
                 if hist_out is not None:
@@ -279,11 +290,26 @@ class SMC(object):
                 hist_data = None
                 for f in self.tmp_files:
                     with tb.open_file(f) as in_file:
-                        tmp_node = in_file.get_node(in_file.root, node_name)
+                        tmp_data = in_file.get_node(in_file.root, node_name)[:]
                         if hist_data is None:
-                            hist_data = tmp_node[:]
+                            # Copy needed for reshape
+                            hist_data = tmp_data.copy()
                         else:
-                            hist_data += tmp_node[:]
+                            # Check if array needs to be enlarged
+                            shape = []
+                            # Loop over dimension
+                            for i in range(len(hist_data.shape)):
+                                if hist_data.shape[i] < tmp_data.shape[i]:
+                                    shape.append(tmp_data.shape[i])
+                                else:
+                                    shape.append(hist_data.shape[i])
+    
+                            hist_data.resize(shape)
+    
+                            # Add array, ignore size
+                            tmp_data.resize(hist_data.shape)
+                            hist_data += tmp_data
+
                 dt = hist_data.dtype
                 out = out_file.create_carray(out_file.root,
                                              atom=tb.Atom.from_dtype(dt),
