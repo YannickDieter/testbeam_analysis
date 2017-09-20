@@ -246,8 +246,8 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
     # calculate the size in col/row for each cluster
     def calc_cluster_dimensions(hits, clusters, cluster_size,
                                 cluster_hit_indices, cluster_index, cluster_id,
-                                charge_correction, noisy_pixels, disabled_pixels,
-                                seed_hit_index):
+                                charge_correction, noisy_pixels,
+                                disabled_pixels, seed_hit_index):
         min_col = hits[cluster_hit_indices[0]].column
         max_col = hits[cluster_hit_indices[0]].column
         min_row = hits[cluster_hit_indices[0]].row
@@ -278,15 +278,15 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
     clz.set_end_of_cluster_function(calc_cluster_dimensions)
 
     # Run clusterizer on hit table in parallel on all cores
-    def work(hits, clz):
-        cl_hits, cl = clz.cluster_hits(hits,
-                                       noisy_pixels=noisy_pixels,
-                                       disabled_pixels=disabled_pixels)
+    def cluster_func(hits, clz):
+        _, cl = clz.cluster_hits(hits,
+                                 noisy_pixels=noisy_pixels,
+                                 disabled_pixels=disabled_pixels)
         return cl
 
     smc.SMC(table_file_in=input_hits_file,
             file_out=output_cluster_file,
-            func=work,
+            func=cluster_func,
             func_kwargs={'clz': clz},
             node_desc={'name': 'Cluster'},
             align_at='event_number',
@@ -303,24 +303,26 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
                 input_mask_file_h5.root.NoisyPixelMask._f_copy(newparent=output_file_h5.root)
 
     # Calculate cluster size histogram
-    with tb.open_file(output_cluster_file, 'r') as input_file_h5:
-        hight = None
-        n_hits = 0
-        n_clusters = input_file_h5.root.Cluster.nrows
-        for start_index in range(0, n_clusters, chunk_size):
-            cluster_n_hits = input_file_h5.root.Cluster[start_index:start_index + chunk_size]['n_hits']
-            # calculate cluster size histogram
-            if hight is None:
-                max_cluster_size = np.amax(cluster_n_hits)
-                hight = analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
-            elif max_cluster_size < np.amax(cluster_n_hits):
-                max_cluster_size = np.amax(cluster_n_hits)
-                hight.resize(max_cluster_size + 1)
-                hight += analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
-            else:
-                hight += analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
-            n_hits += np.sum(cluster_n_hits)
+    def hist_func(cluster):
+        n_hits = cluster['n_hits']
+        hist = analysis_utils.hist_1d_index(n_hits,
+                                            shape=(np.max(n_hits) + 1,))
+        return hist
 
+    smc.SMC(table_file_in=output_cluster_file,
+            file_out=output_cluster_file[:-3] + '_hist.h5',
+            func=hist_func,
+            node_desc={'name': 'HistClusterSize'},
+            chunk_size=chunk_size)
+
+    # Load infos from cluster size for error determination and plotting
+    with tb.open_file(output_cluster_file[:-3] + '_hist.h5', 'r') as input_file_h5:
+        hight = input_file_h5.root.HistClusterSize[:]
+        n_clusters = hight.sum()
+        n_hits = (hight * np.arange(0, hight.shape[0])).sum()
+        max_cluster_size = hight.shape[0] - 1
+
+    # Calculate position error from cluster size 
     def get_eff_pitch(hist, cluster_size):
         ''' Effective pitch to describe the cluster
             size propability distribution
@@ -332,20 +334,27 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
 
         return np.sqrt(hight[int(cluster_size)].astype(np.float) / hight.sum())
 
-    # Set cluster errors
-    with tb.open_file(output_cluster_file, 'r+') as io_file_h5:
-        for start_index in range(0, io_file_h5.root.Cluster.nrows, chunk_size):
-            clusters = io_file_h5.root.Cluster[start_index:start_index + chunk_size]
-            # Set errors for small clusters, where charge sharing enhances resolution
-            for css in [(1, 1), (1, 2), (2, 1), (2, 2)]:
-                sel = np.logical_and(clusters['err_cols'] == css[0], clusters['err_rows'] == css[1])
-                clusters['err_cols'][sel] = get_eff_pitch(hist=hight, cluster_size=css[0]) / np.sqrt(12)
-                clusters['err_rows'][sel] = get_eff_pitch(hist=hight, cluster_size=css[1]) / np.sqrt(12)
-            # Set errors for big clusters, where delta electrons reduce resolution
-            sel = np.logical_or(clusters['err_cols'] > 2, clusters['err_rows'] > 2)
-            clusters['err_cols'][sel] = clusters['err_cols'][sel] / np.sqrt(12)
-            clusters['err_rows'][sel] = clusters['err_rows'][sel] / np.sqrt(12)
-            io_file_h5.root.Cluster[start_index:start_index + chunk_size] = clusters
+    def pos_error_func(clusters):
+        # Set errors for small clusters, where charge sharing enhances
+        # resolution
+        for css in [(1, 1), (1, 2), (2, 1), (2, 2)]:
+            sel = np.logical_and(clusters['err_cols'] == css[0],
+                                 clusters['err_rows'] == css[1])
+            clusters['err_cols'][sel] = get_eff_pitch(hist=hight,
+                                                      cluster_size=css[0]) / np.sqrt(12)
+            clusters['err_rows'][sel] = get_eff_pitch(hist=hight,
+                                                      cluster_size=css[1]) / np.sqrt(12)
+        # Set errors for big clusters, where delta electrons reduce resolution
+        sel = np.logical_or(clusters['err_cols'] > 2, clusters['err_rows'] > 2)
+        clusters['err_cols'][sel] = clusters['err_cols'][sel] / np.sqrt(12)
+        clusters['err_rows'][sel] = clusters['err_rows'][sel] / np.sqrt(12)
+
+        return clusters
+
+    smc.SMC(table_file_in=output_cluster_file,
+            file_out=output_cluster_file,
+            func=pos_error_func,
+            chunk_size=chunk_size)
 
     if plot:
         plot_cluster_size(hight, n_hits, n_clusters, max_cluster_size,
