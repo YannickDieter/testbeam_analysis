@@ -18,10 +18,10 @@ class TestHitAnalysis(unittest.TestCase):
             from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
-            
+
         cls.big_noisy_data_file = analysis_utils.get_data(path='fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0.h5',
-                                                            output=os.path.join(testing_path, 'fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0.h5'))
-            
+                                                          output=os.path.join(testing_path, 'fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0.h5'))
+
         cls.noisy_data_file = analysis_utils.get_data('fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0_small.h5',
                                                       output=os.path.join(testing_path, 'fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0_small.h5'))
         cls.data_file = analysis_utils.get_data('fixtures/hit_analysis/TestBeamData_FEI4_DUT0_small.h5',
@@ -33,14 +33,14 @@ class TestHitAnalysis(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):  # remove created files
         shutil.rmtree(cls.output_folder)
-        
+
     def test_generate_pixel_mask(self):
         output_mask_file = hit_analysis.generate_pixel_mask(input_hits_file=self.big_noisy_data_file,
                                                             output_mask_file=os.path.join(self.output_folder, 'TestBeamData_Mimosa26_DUT0_noisy_pixel_mask.h5'),
                                                             pixel_mask_name="NoisyPixelMask",
                                                             threshold=0.5, n_pixel=(1152, 576),
                                                             pixel_size=(18.4, 18.4), plot=True)
-        
+
         data_equal, error_msg = test_tools.compare_h5_files(analysis_utils.get_data('fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0_noisy_pixel_mask.h5',
                                                                                     output=os.path.join(testing_path,
                                                                                                         'fixtures/hit_analysis/TestBeamData_Mimosa26_DUT0_noisy_pixel_mask.h5')),
@@ -55,7 +55,6 @@ class TestHitAnalysis(unittest.TestCase):
                                                             threshold=10.0, n_pixel=(1152, 576),
                                                             pixel_size=(18.4, 18.4), plot=True)
         output_cluster_file = hit_analysis.cluster_hits(input_hits_file=self.noisy_data_file,
-                                                        create_cluster_hits_table=False,
                                                         input_noisy_pixel_mask_file=output_mask_file,
                                                         min_hit_charge=1, max_hit_charge=1,
                                                         column_cluster_distance=2, row_cluster_distance=2,
@@ -71,7 +70,6 @@ class TestHitAnalysis(unittest.TestCase):
                                                             threshold=10.0, n_pixel=(1152, 576),
                                                             pixel_size=(18.4, 18.4), plot=True)
         output_cluster_file = hit_analysis.cluster_hits(input_hits_file=self.noisy_data_file,
-                                                        create_cluster_hits_table=False,
                                                         input_noisy_pixel_mask_file=output_mask_file,
                                                         min_hit_charge=1, max_hit_charge=1, column_cluster_distance=2,
                                                         row_cluster_distance=2, frame_cluster_distance=1, chunk_size=4999)
@@ -79,7 +77,7 @@ class TestHitAnalysis(unittest.TestCase):
                                                                                     output=os.path.join(testing_path, 'fixtures/hit_analysis/Mimosa26_noisy_pixels_cluster_result.h5')),
                                                             output_cluster_file, exact=False)
         self.assertTrue(data_equal, msg=error_msg)
- 
+
     def test_noisy_pixel_remover(self):
         # Test 1:
         output_mask_file = hit_analysis.generate_pixel_mask(input_hits_file=self.noisy_data_file,
@@ -89,7 +87,6 @@ class TestHitAnalysis(unittest.TestCase):
                                                             pixel_size=(18.4, 18.4), plot=True)
         output_cluster_file = hit_analysis.cluster_hits(input_hits_file=self.noisy_data_file,
                                                         output_cluster_file=os.path.join(self.output_folder, 'TestBeamData_Mimosa26_DUT0_small_clustered.h5'),
-                                                        create_cluster_hits_table=False,
                                                         input_disabled_pixel_mask_file=output_mask_file,
                                                         min_hit_charge=1, max_hit_charge=1, column_cluster_distance=2,
                                                         row_cluster_distance=2, frame_cluster_distance=1)
@@ -104,7 +101,6 @@ class TestHitAnalysis(unittest.TestCase):
                                                             threshold=10.0, n_pixel=(1152, 576), pixel_size=(18.4, 18.4), plot=True)
         output_cluster_file = hit_analysis.cluster_hits(input_hits_file=self.noisy_data_file,
                                                         output_cluster_file=os.path.join(self.output_folder, 'TestBeamData_Mimosa26_DUT0_small_clustered.h5'),
-                                                        create_cluster_hits_table=False,
                                                         input_disabled_pixel_mask_file=output_mask_file,
                                                         min_hit_charge=1, max_hit_charge=1,
                                                         column_cluster_distance=2, row_cluster_distance=2, frame_cluster_distance=1,
@@ -113,7 +109,7 @@ class TestHitAnalysis(unittest.TestCase):
                                                                                     output=os.path.join(testing_path, 'fixtures/hit_analysis/Mimosa26_disabled_pixels_cluster_result.h5')),
                                                             output_cluster_file, exact=False)
         self.assertTrue(data_equal, msg=error_msg)
- 
+
     def test_hit_clustering(self):
         # Test 1:
         output_cluster_file = hit_analysis.cluster_hits(input_hits_file=self.data_file, min_hit_charge=0, max_hit_charge=13,
