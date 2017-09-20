@@ -3,7 +3,6 @@
 
 import logging
 import os
-from multiprocessing import Pool
 
 from testbeam_analysis import (
     hit_analysis, dut_alignment, track_analysis, result_analysis)
@@ -79,20 +78,15 @@ def run_analysis(n_events):
     # The following shows a complete test beam analysis by calling the separate
     # function in correct order
 
-    # Cluster hits off all DUTs
-    kwargs = [{
-        'input_hits_file': data_files[i],
-        'min_hit_charge': 1,  # in electrons
-        'max_hit_charge': 2 ** 16,
-        'column_cluster_distance': 1,
-        'row_cluster_distance': 1,
-        'frame_cluster_distance': 2,  # simulation
-        'dut_name': data_files[i]} for i in range(len(data_files))]
-    pool = Pool()
-    for kwarg in kwargs:
-        pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)
-    pool.close()
-    pool.join()
+    # Cluster hits from all DUTs
+    for i, data_file in enumerate(data_files):
+        hit_analysis.cluster_hits(input_hits_file=data_file,
+                                  min_hit_charge=1,
+                                  max_hit_charge=2 ** 16,
+                                  column_cluster_distance=1,
+                                  row_cluster_distance=1,
+                                  frame_cluster_distance=2,
+                                  dut_name=data_files[i])
 
     # Generate filenames for cluster data
     input_cluster_files = [os.path.splitext(data_file)[0] + '_clustered.h5'

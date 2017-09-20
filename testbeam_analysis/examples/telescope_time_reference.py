@@ -14,7 +14,6 @@ The timing reference is about 2 cm x 2 cm divided into 80 x 336 pixels. The time
 import os
 import logging
 import numpy as np
-from multiprocessing import Pool
 
 from testbeam_analysis import hit_analysis
 from testbeam_analysis import dut_alignment
@@ -47,42 +46,29 @@ def run_analysis():
 
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
-    # Generate noisy pixel mask
-    # A pool of workers to remove the noisy pixels for all files in parallel
+    # Generate noisy pixel mask for all DUTs
     threshold = [2, 2, 2, 10, 10, 2, 2, 2]
-    kwargs = [{
-        'input_hits_file': data_files[i],
-        'n_pixel': n_pixels[i],
-        'pixel_mask_name': "NoisyPixelMask",
-        'pixel_size': pixel_size[i],
-        'threshold': threshold[i],
-        'dut_name': dut_names[i]} for i in range(len(data_files))]
-    pool = Pool()
-    for kwarg in kwargs:
-        pool.apply_async(hit_analysis.generate_pixel_mask, kwds=kwarg)
-    pool.close()
-    pool.join()
+    for i, data_file in enumerate(data_files):
+        hit_analysis.generate_pixel_mask(input_hits_file=data_file,
+                                         n_pixel=n_pixels[i],
+                                         pixel_mask_name='NoisyPixelMask',
+                                         pixel_size=pixel_size[i],
+                                         threshold=threshold[i],
+                                         dut_name=dut_names[i])
 
     # Cluster hits from all DUTs
-    # A pool of workers to cluster hits for all files in parallel
     column_cluster_distance = [3, 3, 3, 2, 2, 3, 3, 3]
     row_cluster_distance = [3, 3, 3, 3, 3, 3, 3, 3]
-    # events built with Judith analysis software, no frame information available
     frame_cluster_distance = [0, 0, 0, 0, 0, 0, 0, 0]
-    kwargs = [{
-        'input_hits_file': data_files[i],
-        'input_noisy_pixel_mask_file': os.path.splitext(data_files[i])[0] + '_noisy_pixel_mask.h5',
-        'min_hit_charge': 0,
-        'max_hit_charge': 13,
-        'column_cluster_distance': column_cluster_distance[i],
-        'row_cluster_distance': row_cluster_distance[i],
-        'frame_cluster_distance': frame_cluster_distance[i],
-        'dut_name': dut_names[i]} for i in range(len(data_files))]
-    pool = Pool()
-    for kwarg in kwargs:
-        pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)
-    pool.close()
-    pool.join()
+    for i, data_file in enumerate(data_files):
+        hit_analysis.cluster_hits(input_hits_file=data_file,
+                                  input_noisy_pixel_mask_file=os.path.splitext(data_files[i])[0] + '_noisy_pixel_mask.h5',
+                                  min_hit_charge=0,
+                                  max_hit_charge=13,
+                                  column_cluster_distance=column_cluster_distance[i],
+                                  row_cluster_distance=row_cluster_distance[i],
+                                  frame_cluster_distance=frame_cluster_distance[i],
+                                  dut_name=dut_names[i])
 
     # Generate filenames for cluster data
     input_cluster_files = [os.path.splitext(data_file)[0] + '_clustered.h5'
@@ -240,6 +226,7 @@ def run_analysis():
                                                       (20000, 10000),
                                                       (20000, 10000),
                                                       (20000, 10000)])
+
 
 if __name__ == '__main__':  # Main entry point is needed for multiprocessing under windows
     run_analysis()

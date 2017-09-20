@@ -14,7 +14,6 @@
 import os
 import inspect
 import logging
-from multiprocessing import Pool
 
 from testbeam_analysis import hit_analysis
 from testbeam_analysis import dut_alignment
@@ -37,22 +36,18 @@ def run_analysis(data_files):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    # The following shows a complete test beam analysis by calling the seperate function in correct order
+    # The following shows a complete test beam analysis by calling the seperate
+    # function in correct order
 
-    # Cluster hits off all DUTs
-    kwargs = [{
-        'input_hits_file': data_files[i],
-        'min_hit_charge': 0,  # FEI4 ToT value
-        'max_hit_charge': 13,
-        'column_cluster_distance': 1,
-        'row_cluster_distance': 2,
-        'frame_cluster_distance': 2,  # BCID, recoreded by pyBAR
-        'dut_name': dut_names[i]} for i in range(len(data_files))]
-    pool = Pool()
-    for kwarg in kwargs:
-        pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)
-    pool.close()
-    pool.join()
+    # Cluster hits from all DUTs
+    for i, data_file in enumerate(data_files):
+        hit_analysis.cluster_hits(input_hits_file=data_file,
+                                  min_hit_charge=0,
+                                  max_hit_charge=13,
+                                  column_cluster_distance=1,
+                                  row_cluster_distance=2,
+                                  frame_cluster_distance=2,
+                                  dut_name=dut_names[i])
 
     # Generate filenames for cluster data
     input_cluster_files = [os.path.splitext(data_file)[0] + '_clustered.h5'

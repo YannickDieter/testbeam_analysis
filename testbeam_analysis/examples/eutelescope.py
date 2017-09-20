@@ -45,7 +45,6 @@
 import os
 import inspect
 import logging
-from multiprocessing import Pool
 
 from testbeam_analysis import (hit_analysis, dut_alignment, track_analysis,
                                result_analysis)
@@ -74,7 +73,7 @@ def run_analysis(data_files):
     # The following shows a complete test beam analysis by calling the
     # seperate function in correct order
 
-    # Generate noisy pixel mask
+    # Generate noisy pixel mask for all DUTs
     for i, data_file in enumerate(data_files):
         hit_analysis.generate_pixel_mask(input_hits_file=data_file,
                                          n_pixel=n_pixels[i],
@@ -84,21 +83,15 @@ def run_analysis(data_files):
                                          dut_name=dut_names[i])
 
     # Cluster hits from all DUTs
-    # A pool of workers to cluster hits for all files in parallel
-    kwargs = [{
-        'input_hits_file': data_files[i],
-        'input_noisy_pixel_mask_file': os.path.splitext(data_files[i])[0] + '_noisy_pixel_mask.h5',
-        'min_hit_charge': 0,
-        'max_hit_charge': 1,
-        'column_cluster_distance': 3,
-        'row_cluster_distance': 3,
-        'frame_cluster_distance': 1,  # recoreded by the EUTelescope
-        'dut_name': dut_names[i]} for i in range(len(data_files))]
-    pool = Pool()
-    for kwarg in kwargs:
-        pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)
-    pool.close()
-    pool.join()
+    for i, data_file in enumerate(data_files):
+        hit_analysis.cluster_hits(input_hits_file=data_file,
+                                  input_noisy_pixel_mask_file=os.path.splitext(data_files[i])[0] + '_noisy_pixel_mask.h5',
+                                  min_hit_charge=0,
+                                  max_hit_charge=1,
+                                  column_cluster_distance=3,
+                                  row_cluster_distance=3,
+                                  frame_cluster_distance=1,
+                                  dut_name=dut_names[i])
 
     # Generate filenames for cluster data
     input_cluster_files = [os.path.splitext(data_file)[0] + '_clustered.h5'
@@ -303,6 +296,6 @@ if __name__ == '__main__':
     # The location of the data files, one file per DUT
     data_files = [analysis_utils.get_data(path='examples/TestBeamData_Mimosa26_DUT%d.h5' % i,
                                           output=os.path.join(tests_data_folder,
-                                                                   'TestBeamData_Mimosa26_DUT%d.h5' % i)) for i in range(6)]  # The first device is the reference for the coordinate system
+                                                              'TestBeamData_Mimosa26_DUT%d.h5' % i)) for i in range(6)]  # The first device is the reference for the coordinate system
 
     run_analysis(data_files)
