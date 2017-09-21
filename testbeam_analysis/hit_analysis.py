@@ -228,17 +228,16 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
         output_cluster_file = os.path.splitext(input_hits_file)[0] + '_clustered.h5'
 
     # Get noisy and disabled pixel, they are excluded for clusters
-    with tb.open_file(input_hits_file, 'r') as input_file_h5:
-        if input_disabled_pixel_mask_file is not None:
-            with tb.open_file(input_disabled_pixel_mask_file, 'r') as input_mask_file_h5:
-                disabled_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.DisabledPixelMask[:]))[0] + 1
-        else:
-            disabled_pixels = None
-        if input_noisy_pixel_mask_file is not None:
-            with tb.open_file(input_noisy_pixel_mask_file, 'r') as input_mask_file_h5:
-                noisy_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.NoisyPixelMask[:]))[0] + 1
-        else:
-            noisy_pixels = None
+    if input_disabled_pixel_mask_file is not None:
+        with tb.open_file(input_disabled_pixel_mask_file, 'r') as input_mask_file_h5:
+            disabled_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.DisabledPixelMask[:]))[0] + 1
+    else:
+        disabled_pixels = None
+    if input_noisy_pixel_mask_file is not None:
+        with tb.open_file(input_noisy_pixel_mask_file, 'r') as input_mask_file_h5:
+            noisy_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.NoisyPixelMask[:]))[0] + 1
+    else:
+        noisy_pixels = None
 
     # Prepare clusterizer
 
@@ -367,3 +366,7 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
                           output_pdf_file=os.path.splitext(output_cluster_file)[0] + '_cluster_size.pdf')
 
     return output_cluster_file
+
+
+if __name__ == '__main__':
+    pass
