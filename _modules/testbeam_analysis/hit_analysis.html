@@ -437,6 +437,7 @@
     <span class="c1"># Add an additional fields to hold the cluster size in x/y</span>
     <span class="n">clz</span><span class="o">.</span><span class="n">add_cluster_field</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;err_cols&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;f4&#39;</span><span class="p">))</span>
     <span class="n">clz</span><span class="o">.</span><span class="n">add_cluster_field</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;err_rows&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;f4&#39;</span><span class="p">))</span>
+    <span class="n">clz</span><span class="o">.</span><span class="n">set_end_of_cluster_function</span><span class="p">(</span><span class="n">calc_cluster_dimensions</span><span class="p">)</span>
 
     <span class="c1"># Run clusterizer on hit table in parallel on all cores</span>
     <span class="k">def</span> <span class="nf">cluster_func</span><span class="p">(</span><span class="n">hits</span><span class="p">,</span> <span class="n">clz</span><span class="p">,</span> <span class="n">calc_cluster_dimensions</span><span class="p">):</span>
@@ -493,6 +494,11 @@
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">hight</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">cluster_size</span><span class="p">)]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">)</span> <span class="o">/</span> <span class="n">hight</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
 
     <span class="k">def</span> <span class="nf">pos_error_func</span><span class="p">(</span><span class="n">clusters</span><span class="p">):</span>
+        <span class="c1"># Check if end_of_cluster function was called</span>
+        <span class="c1"># Under unknown and rare circumstances this might not be the case</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">clusters</span><span class="p">[</span><span class="s1">&#39;err_cols&#39;</span><span class="p">]):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;Clustering failed, please report bug at:&#39;</span>
+                               <span class="s1">&#39;https://github.com/SiLab-Bonn/testbeam_analysis/issues&#39;</span><span class="p">)</span>
         <span class="c1"># Set errors for small clusters, where charge sharing enhances</span>
         <span class="c1"># resolution</span>
         <span class="k">for</span> <span class="n">css</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)]:</span>
