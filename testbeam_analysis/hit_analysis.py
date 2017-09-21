@@ -274,11 +274,15 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
     # Add an additional fields to hold the cluster size in x/y
     clz.add_cluster_field(description=('err_cols', '<f4'))
     clz.add_cluster_field(description=('err_rows', '<f4'))
-    # Set the new function to the clusterizer
-    clz.set_end_of_cluster_function(calc_cluster_dimensions)
 
     # Run clusterizer on hit table in parallel on all cores
-    def cluster_func(hits, clz):
+    def cluster_func(hits, clz, calc_cluster_dimensions):
+        # Add cluster size calculation
+        # EDGE CASE: the reference of an in time jitted function
+        # does not seem to be pickled correctly when transfered
+        # to the worker thread. Thus it has to be set here
+        # manually. This might be solved in the future
+        clz.set_end_of_cluster_function(calc_cluster_dimensions)
         _, cl = clz.cluster_hits(hits,
                                  noisy_pixels=noisy_pixels,
                                  disabled_pixels=disabled_pixels)
@@ -287,7 +291,8 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
     smc.SMC(table_file_in=input_hits_file,
             file_out=output_cluster_file,
             func=cluster_func,
-            func_kwargs={'clz': clz},
+            func_kwargs={'clz': clz,
+                         'calc_cluster_dimensions': calc_cluster_dimensions},
             node_desc={'name': 'Cluster'},
             align_at='event_number',
             chunk_size=chunk_size)
