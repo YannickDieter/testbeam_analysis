@@ -51,10 +51,17 @@ class SMC(object):
                 Function to be applied on table chunks.
             func_kwargs : dict
                 Additional kwargs to pass to worker function
-            node_desc : dict, None
-                Output table/array parameters from pytables.table().
-                If None filters are set from input table and data
-                format is set from return value of func.
+            node_desc : dict
+                Output table/array parameters for pytables. Can be empty.
+                Name/Filters/Title values are deduced from the input table
+                if not defined. Data type is deduced from resulting data
+                format if not defined.
+                
+                Example:
+                node_desc = {'name': test}
+                Would create an output node with the name test, the title and
+                filters as the input table and the data type is deduced from 
+                the calculated data.
             table : string, iterable of strings, None
                 string: Table name. Needed if multiple tables exists in file.
                 iterable of strings: possible table names. First existing table
@@ -125,14 +132,10 @@ class SMC(object):
             # Set number of rows
             self.n_rows = node.shape[0]
 
-            # Set output parameters for output data
-            # If not defined deduce from input
-            if 'filter' not in self.node_desc:
-                self.node_desc['filters'] = node.filters
-            if 'name' not in self.node_desc:
-                self.node_desc['name'] = node.name
-            if 'title' not in self.node_desc:
-                self.node_desc['title'] = node.title
+            # Set output parameters from input if not defined
+            self.node_desc.setdefault('filters', node.filters)
+            self.node_desc.setdefault('name', node.name)
+            self.node_desc.setdefault('title', node.title)
 
         if not self.n_cores:  # Set n_cores to maximum cores available
             self.n_cores = cpu_count()
@@ -203,10 +206,13 @@ class SMC(object):
             output_file = tempfile.NamedTemporaryFile(delete=False)
             with tb.open_file(output_file.name, 'w') as out_file:
                 # Create result table with specified data format
+                # From given pytables tables description
                 if 'description' in node_desc:
                     table_out = out_file.create_table(out_file.root,
                                                       **node_desc)
-                else:  # Data format unknown
+                # Data format unknown and has to be determined later
+                # and thus the table has to be created later
+                else:
                     table_out = None
                 # Create result histogram
                 hist_out = None
@@ -218,7 +224,7 @@ class SMC(object):
 
                     data_ret = func(data, **func_kwargs)
                     # Create table if not existing
-                    # Extract data type from returned data
+                    # Extract table description from returned data
                     if not table_out:
                         if data_ret.dtype.names:  # Recarray thus table needed
                             dcr = data_ret.dtype
