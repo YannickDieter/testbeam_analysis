@@ -392,17 +392,16 @@
         <span class="n">output_cluster_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_clustered.h5&#39;</span>
 
     <span class="c1"># Get noisy and disabled pixel, they are excluded for clusters</span>
-    <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_file_h5</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">input_disabled_pixel_mask_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_disabled_pixel_mask_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_mask_file_h5</span><span class="p">:</span>
-                <span class="n">disabled_pixels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dstack</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">DisabledPixelMask</span><span class="p">[:]))[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">disabled_pixels</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="k">if</span> <span class="n">input_noisy_pixel_mask_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_noisy_pixel_mask_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_mask_file_h5</span><span class="p">:</span>
-                <span class="n">noisy_pixels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dstack</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">NoisyPixelMask</span><span class="p">[:]))[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">noisy_pixels</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">input_disabled_pixel_mask_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_disabled_pixel_mask_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_mask_file_h5</span><span class="p">:</span>
+            <span class="n">disabled_pixels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dstack</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">DisabledPixelMask</span><span class="p">[:]))[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">disabled_pixels</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">input_noisy_pixel_mask_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_noisy_pixel_mask_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_mask_file_h5</span><span class="p">:</span>
+            <span class="n">noisy_pixels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dstack</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">NoisyPixelMask</span><span class="p">[:]))[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">noisy_pixels</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="c1"># Prepare clusterizer</span>
 
@@ -531,6 +530,10 @@
                           <span class="n">output_pdf_file</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">output_cluster_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_cluster_size.pdf&#39;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">output_cluster_file</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="k">pass</span>
 </pre></div>
 
            </div>
