@@ -438,11 +438,15 @@
     <span class="c1"># Add an additional fields to hold the cluster size in x/y</span>
     <span class="n">clz</span><span class="o">.</span><span class="n">add_cluster_field</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;err_cols&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;f4&#39;</span><span class="p">))</span>
     <span class="n">clz</span><span class="o">.</span><span class="n">add_cluster_field</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;err_rows&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;f4&#39;</span><span class="p">))</span>
-    <span class="c1"># Set the new function to the clusterizer</span>
-    <span class="n">clz</span><span class="o">.</span><span class="n">set_end_of_cluster_function</span><span class="p">(</span><span class="n">calc_cluster_dimensions</span><span class="p">)</span>
 
     <span class="c1"># Run clusterizer on hit table in parallel on all cores</span>
-    <span class="k">def</span> <span class="nf">cluster_func</span><span class="p">(</span><span class="n">hits</span><span class="p">,</span> <span class="n">clz</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">cluster_func</span><span class="p">(</span><span class="n">hits</span><span class="p">,</span> <span class="n">clz</span><span class="p">,</span> <span class="n">calc_cluster_dimensions</span><span class="p">):</span>
+        <span class="c1"># Add cluster size calculation</span>
+        <span class="c1"># EDGE CASE: the reference of an in time jitted function</span>
+        <span class="c1"># does not seem to be pickled correctly when transfered</span>
+        <span class="c1"># to the worker thread. Thus it has to be set here</span>
+        <span class="c1"># manually. This might be solved in the future</span>
+        <span class="n">clz</span><span class="o">.</span><span class="n">set_end_of_cluster_function</span><span class="p">(</span><span class="n">calc_cluster_dimensions</span><span class="p">)</span>
         <span class="n">_</span><span class="p">,</span> <span class="n">cl</span> <span class="o">=</span> <span class="n">clz</span><span class="o">.</span><span class="n">cluster_hits</span><span class="p">(</span><span class="n">hits</span><span class="p">,</span>
                                  <span class="n">noisy_pixels</span><span class="o">=</span><span class="n">noisy_pixels</span><span class="p">,</span>
                                  <span class="n">disabled_pixels</span><span class="o">=</span><span class="n">disabled_pixels</span><span class="p">)</span>
@@ -451,7 +455,8 @@
     <span class="n">smc</span><span class="o">.</span><span class="n">SMC</span><span class="p">(</span><span class="n">table_file_in</span><span class="o">=</span><span class="n">input_hits_file</span><span class="p">,</span>
             <span class="n">file_out</span><span class="o">=</span><span class="n">output_cluster_file</span><span class="p">,</span>
             <span class="n">func</span><span class="o">=</span><span class="n">cluster_func</span><span class="p">,</span>
-            <span class="n">func_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;clz&#39;</span><span class="p">:</span> <span class="n">clz</span><span class="p">},</span>
+            <span class="n">func_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;clz&#39;</span><span class="p">:</span> <span class="n">clz</span><span class="p">,</span>
+                         <span class="s1">&#39;calc_cluster_dimensions&#39;</span><span class="p">:</span> <span class="n">calc_cluster_dimensions</span><span class="p">},</span>
             <span class="n">node_desc</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;Cluster&#39;</span><span class="p">},</span>
             <span class="n">align_at</span><span class="o">=</span><span class="s1">&#39;event_number&#39;</span><span class="p">,</span>
             <span class="n">chunk_size</span><span class="o">=</span><span class="n">chunk_size</span><span class="p">)</span>
