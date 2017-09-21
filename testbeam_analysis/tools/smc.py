@@ -125,7 +125,8 @@ class SMC(object):
             # Set number of rows
             self.n_rows = node.shape[0]
 
-            # Set output parameters for output table
+            # Set output parameters for output data
+            # If not defined deduce from input
             if 'filter' not in self.node_desc:
                 self.node_desc['filters'] = node.filters
             if 'name' not in self.node_desc:
@@ -140,7 +141,7 @@ class SMC(object):
             if self.n_rows < 2. * self.chunk_size:
                 self.n_cores = 1
 
-        # The three main step
+        # The three main steps
         self._split()
         self._map()
         self._combine()
@@ -286,39 +287,43 @@ class SMC(object):
                         for i in range(0, tmp_node.shape[0], self.chunk_size):
                             node.append(tmp_node[i: i + self.chunk_size])
         else:  # TODO: solution without having all hists in RAM
-            with tb.open_file(self.file_out, 'w') as out_file:
-                hist_data = None
-                for f in self.tmp_files:
-                    with tb.open_file(f) as in_file:
-                        tmp_data = in_file.get_node(in_file.root, node_name)[:]
-                        if hist_data is None:
-                            # Copy needed for reshape
-                            hist_data = tmp_data.copy()
-                        else:
-                            # Check if array needs to be enlarged
-                            shape = []
-                            # Loop over dimension
-                            for i in range(len(hist_data.shape)):
-                                if hist_data.shape[i] < tmp_data.shape[i]:
-                                    shape.append(tmp_data.shape[i])
-                                else:
-                                    shape.append(hist_data.shape[i])
+            # Only one file, merging not needed
+            if len(self.tmp_files) == 1:
+                shutil.move(self.tmp_files[0], self.file_out)   
+            else:  # Several files, merge them by adding up
+                with tb.open_file(self.file_out, 'w') as out_file:
+                    hist_data = None
+                    for f in self.tmp_files:
+                        with tb.open_file(f) as in_file:
+                            tmp_data = in_file.get_node(in_file.root, node_name)[:]
+                            if hist_data is None:
+                                # Copy needed for reshape
+                                hist_data = tmp_data.copy()
+                            else:
+                                # Check if array needs to be enlarged
+                                shape = []
+                                # Loop over dimension
+                                for i in range(len(hist_data.shape)):
+                                    if hist_data.shape[i] < tmp_data.shape[i]:
+                                        shape.append(tmp_data.shape[i])
+                                    else:
+                                        shape.append(hist_data.shape[i])
+        
+                                hist_data.resize(shape)
+        
+                                # Add array, ignore size
+                                tmp_data.resize(hist_data.shape)
+                                hist_data += tmp_data
     
-                            hist_data.resize(shape)
-    
-                            # Add array, ignore size
-                            tmp_data.resize(hist_data.shape)
-                            hist_data += tmp_data
-
-                dt = hist_data.dtype
-                out = out_file.create_carray(out_file.root,
-                                             atom=tb.Atom.from_dtype(dt),
-                                             shape=hist_data.shape,
-                                             **self.node_desc)
-                out[:] = hist_data
+                    dt = hist_data.dtype
+                    out = out_file.create_carray(out_file.root,
+                                                 atom=tb.Atom.from_dtype(dt),
+                                                 shape=hist_data.shape,
+                                                 **self.node_desc)
+                    out[:] = hist_data
 
     def _get_split_indeces(self):
-        ''' Calculates the data for each core.
+        ''' Calculates the data range for each core.
 
             Return two lists with start/stop indeces.
             Stop indeces are exclusive.
