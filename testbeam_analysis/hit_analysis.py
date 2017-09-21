@@ -273,6 +273,7 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
     # Add an additional fields to hold the cluster size in x/y
     clz.add_cluster_field(description=('err_cols', '<f4'))
     clz.add_cluster_field(description=('err_rows', '<f4'))
+    clz.set_end_of_cluster_function(calc_cluster_dimensions)
 
     # Run clusterizer on hit table in parallel on all cores
     def cluster_func(hits, clz, calc_cluster_dimensions):
@@ -329,6 +330,11 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
         return np.sqrt(hight[int(cluster_size)].astype(np.float) / hight.sum())
 
     def pos_error_func(clusters):
+        # Check if end_of_cluster function was called
+        # Under unknown and rare circumstances this might not be the case
+        if not np.any(clusters['err_cols']):
+            raise RuntimeError('Clustering failed, please report bug at:'
+                               'https://github.com/SiLab-Bonn/testbeam_analysis/issues')
         # Set errors for small clusters, where charge sharing enhances
         # resolution
         for css in [(1, 1), (1, 2), (2, 1), (2, 2)]:
