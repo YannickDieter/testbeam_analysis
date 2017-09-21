@@ -5,7 +5,6 @@ via the QObject.moveToThread() method.
 
 import traceback
 
-from multiprocessing import Pool
 from PyQt5 import QtCore
 
 
@@ -45,14 +44,13 @@ class AnalysisWorker(QtCore.QObject):
             # Do analysis functions
             if self.funcs_args is not None:
 
-                pool = Pool()
                 for func, kwargs in self.funcs_args:
 
                     # If kwargs is list, do func for each element in kwargs; used for parallel analysis
                     if isinstance(kwargs, list):
 
                         for k in kwargs:
-                            pool.apply_async(self.main_func(func, k))
+                            self.main_func(func, k)
 
                             # Increase index and emit signal
                             index_status += 1
@@ -60,14 +58,11 @@ class AnalysisWorker(QtCore.QObject):
 
                     # Each func has unique kwargs; used for analysis
                     else:
-                        pool.apply_async(self.main_func(func, kwargs))
+                        self.main_func(func, kwargs)
 
                         # Increase index and emit signal
                         index_status += 1
                         self.statusSignal.emit(index_status)
-
-                pool.close()
-                pool.join()
 
             # Do some arbitrary function
             else:
