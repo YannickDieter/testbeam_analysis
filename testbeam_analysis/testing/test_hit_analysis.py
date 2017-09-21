@@ -34,13 +34,13 @@ class TestHitAnalysis(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):  # remove created files
         os.remove(os.path.join(cls.output_folder, 'TestBeamData_FEI4_DUT0_small_clustered.h5'))
-        os.remove(os.path.join(cls.output_folder, 'TestBeamData_FEI4_DUT0_small_clustered_cluster_size.pdf'))
+        os.remove(os.path.join(cls.output_folder, 'TestBeamData_FEI4_DUT0_small_clustered_cluster_hists.pdf'))
         os.remove(os.path.join(cls.output_folder, 'TestBeamData_Mimosa26_DUT0_small_noisy_pixel_mask.h5'))
         os.remove(os.path.join(cls.output_folder, 'TestBeamData_Mimosa26_DUT0_small_noisy_pixel_mask_masked_pixels.pdf'))
         os.remove(os.path.join(cls.output_folder, 'TestBeamData_Mimosa26_DUT0_small_disabled_pixel_mask.h5'))
         os.remove(os.path.join(cls.output_folder, 'TestBeamData_Mimosa26_DUT0_small_disabled_pixel_mask_masked_pixels.pdf'))
         os.remove(os.path.join(cls.output_folder, 'TestBeamData_Mimosa26_DUT0_small_clustered.h5'))
-        os.remove(os.path.join(cls.output_folder, 'TestBeamData_Mimosa26_DUT0_small_clustered_cluster_size.pdf'))
+        os.remove(os.path.join(cls.output_folder, 'TestBeamData_Mimosa26_DUT0_small_clustered_cluster_hists.pdf'))
 
     def test_noisy_pixel_masking(self):
         # Test 1:
