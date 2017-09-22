@@ -533,7 +533,10 @@ def data_aligned_at_events(table, start_event_number=None, stop_event_number=Non
             nrows = chunk_stop_index - chunk_start_index
             if nrows == 0:
                 if array_chunk.shape[0] == chunk_size and first_event_in_chunk == last_event_in_chunk:
-                    raise ValueError('Chunk size too small to fit event. Data corruption possible. Increase chunk size to read full event.')
+                    raise ValueError('Chunk size too small to fit event. '
+                                     'Data corruption possible. Increase '
+                                     'chunk size to read full event and '
+                                     'check event numbers.')
                 elif chunk_start_index == 0:  # not increasing current_start_index
                     return
                 elif stop_event_number is not None and last_event_in_chunk >= stop_event_number:
