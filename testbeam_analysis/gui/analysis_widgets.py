@@ -322,12 +322,9 @@ class AnalysisWidget(QtWidgets.QWidget):
         elif 'str' in dtype:
             widget = option_widget.OptionText(
                 name, default_value, optional, tooltip, parent=self)
-        elif 'int' in dtype:
+        elif 'int' in dtype or 'float' in dtype:
             widget = option_widget.OptionSlider(
-                name, default_value, optional, tooltip, parent=self)
-        elif 'float' in dtype:
-            widget = option_widget.OptionSlider(
-                name, default_value, optional, tooltip, parent=self)
+                name, default_value, optional, tooltip, dtype, parent=self)
         elif 'bool' in dtype:
             widget = option_widget.OptionBool(
                 name, default_value, optional, tooltip, parent=self)
