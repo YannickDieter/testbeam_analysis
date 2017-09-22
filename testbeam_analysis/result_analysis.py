@@ -731,7 +731,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
                     # Cut in Chi 2 of the track fit
                     if actual_max_chi2:
-                        tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= max_chi2]
+                        tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= actual_max_chi2]
 
                     # Transform the hits and track intersections into the local coordinate system
                     # Coordinates in global coordinate system (x, y, z)
