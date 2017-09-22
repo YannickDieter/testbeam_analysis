@@ -186,15 +186,13 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.settings_menu.addAction('&Global', self.global_settings)
         self.menuBar().addMenu(self.settings_menu)
 
-        # FIXME: Don't support this feature for Windows now, since it causes crashes
-        if platform.system() != 'Windows' or _DEBUG:
-            self.run_menu = QtWidgets.QMenu('&Run', self)
-            self.run_menu.setToolTipsVisible(True)
-            self.run_menu.addAction('&Run consecutive analysis', self.run_consecutive_analysis, QtCore.Qt.CTRL + QtCore.Qt.Key_R)
-            # Disable consecutive analysis until setup is done
-            self.run_menu.actions()[0].setEnabled(False)
-            self.run_menu.actions()[0].setToolTip('Finish data selection and testbeam setup to enable')
-            self.menuBar().addMenu(self.run_menu)
+        self.run_menu = QtWidgets.QMenu('&Run', self)
+        self.run_menu.setToolTipsVisible(True)
+        self.run_menu.addAction('&Run consecutive analysis', self.run_consecutive_analysis, QtCore.Qt.CTRL + QtCore.Qt.Key_R)
+        # Disable consecutive analysis until setup is done
+        self.run_menu.actions()[0].setEnabled(False)
+        self.run_menu.actions()[0].setToolTip('Finish data selection and testbeam setup to enable')
+        self.menuBar().addMenu(self.run_menu)
 
         self.appearance_menu = QtWidgets.QMenu('&Appearance', self)
         self.appearance_menu.setToolTipsVisible(True)
@@ -298,13 +296,11 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                     for xx in [lambda: self.update_tabs(data=self.tw['Setup'].data, skip='Setup'),
                                lambda: self.appearance_menu.actions()[1].setEnabled(True),
                                lambda: self.appearance_menu.actions()[1].setToolTip(msg_1),
-                               lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
+                               lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1),
+                               lambda: self.run_menu.actions()[0].setEnabled(True),  # Enable consecutive analysis
+                               lambda: self.run_menu.actions()[0].setToolTip(msg_0)]:
                         self.tw[name].proceedAnalysis.connect(xx)
                     self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
-                    if platform.system() != 'Windows' or _DEBUG:
-                        for xx_x in [lambda: self.run_menu.actions()[0].setEnabled(True),  # Enable consecutive analysis
-                                     lambda: self.run_menu.actions()[0].setToolTip(msg_0)]:
-                            self.tw[name].proceedAnalysis.connect(xx_x)
 
                 if name == 'Alignment':
                     for xxx in [lambda: self.update_tabs(data={'skip_alignment': True},
@@ -547,9 +543,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.tw = {}
 
         # Disable consecutive analysis until setup is done
-        if platform.system() != 'Windows' or _DEBUG:
-            self.run_menu.actions()[0].setEnabled(False)
-            self.run_menu.actions()[0].setToolTip('Finish data selection and testbeam setup to enable')
+        self.run_menu.actions()[0].setEnabled(False)
+        self.run_menu.actions()[0].setToolTip('Finish data selection and testbeam setup to enable')
 
         for i in reversed(range(self.main_splitter.count())):
             w = self.main_splitter.widget(i)

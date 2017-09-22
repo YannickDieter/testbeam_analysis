@@ -15,10 +15,13 @@ class OptionSlider(QtWidgets.QWidget):  # FIXME: steps size != 1 not supported
         Shows the value as text and can increase range
     '''
 
-    valueChanged = QtCore.pyqtSignal([float])
+    valueChanged = QtCore.pyqtSignal([object])  # Either int or float
 
-    def __init__(self, name, default_value, optional, tooltip, parent=None):
+    def __init__(self, name, default_value, optional, tooltip, dtype, parent=None):
         super(OptionSlider, self).__init__(parent)
+
+        # Store dtype
+        self._dtype = dtype
 
         # Slider with textbox to the right
         layout_2 = QtWidgets.QHBoxLayout()
@@ -88,7 +91,9 @@ class OptionSlider(QtWidgets.QWidget):  # FIXME: steps size != 1 not supported
         if self.edit.isReadOnly() or not self.edit.text():
             self.valueChanged.emit(float('nan'))
         else:
-            self.valueChanged.emit(int(self.edit.text()))
+            # Separate options that need int dtypes e.g. range(int) from floats
+            value = int(self.edit.text()) if 'int' in self._dtype else float(self.edit.text())
+            self.valueChanged.emit(value)
 
 
 class OptionText(QtWidgets.QWidget):
@@ -290,15 +295,13 @@ class OptionMultiSlider(QtWidgets.QWidget):
 
 
 class OptionMultiBox(QtWidgets.QWidget):
-    ''' Option boxes 2(NxN) dimensions
+    ''' Option boxes 2(NxN) or 1(N) dimensions
     '''
 
     valueChanged = QtCore.pyqtSignal(list)
 
     def __init__(self, name, labels_x, default_value, optional, tooltip, labels_y=None, parent=None):
         super(OptionMultiBox, self).__init__(parent)
-
-        #TODO: separate dtype for iterable of iterables where order of duts is selected
 
         # different color palettes to visualize disabled widgets
         # disabled
