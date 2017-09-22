@@ -64,11 +64,11 @@ def run_analysis():
     data_files[2], data_files[3] = fix_mono_data(data_files=[data_files[2],
                                                              data_files[3]])
 
-    for i, hit_file in enumerate(data_files[7:]):
+    for i, hit_file in enumerate(data_files):
         hit_analysis.check_file(
             input_hits_file=hit_file,
             n_pixel=n_pixels[i],
-            )
+        )
 
     # The following shows a complete test beam analysis by calling the seperate
     # function in correct order
@@ -83,7 +83,7 @@ def run_analysis():
             pixel_size=pixel_size[i],
             threshold=threshold[i],
             dut_name=dut_names[i])
-    raise
+
     # Cluster hits from all DUTs
     column_cluster_distance = [3, 3, 2, 2, 3, 3, 3, 1]
     row_cluster_distance = [3, 3, 3, 3, 3, 3, 3, 2]
@@ -150,40 +150,119 @@ def run_analysis():
                                           'Tracklets_prealigned.h5'),
         input_alignment_file=os.path.join(output_folder,
                                           'Alignment.h5'),
-        output_track_candidates_file=os.path.join(output_folder,
-                                                  'TrackCandidates_prealignment.h5'))
+        output_track_candidates_file=os.path.join(
+            output_folder,
+            'TrackCandidates_prealignment.h5'))
+
+    # Select tracks with any hit in the time reference and all position
+    # devices to increase analysis speed due to data reduction
+    data_selection.select_hits(
+        hit_file=os.path.join(output_folder,
+                              'TrackCandidates_prealignment.h5'),
+        track_quality=0b11110011,
+        track_quality_mask=0b11110011)
+
+    # Do an alignment step with the track candidates, corrects rotations and is therefore much more precise than simple prealignment
+    dut_alignment.alignment(
+        input_track_candidates_file=os.path.join(
+            output_folder, 'TrackCandidates_prealignment_reduced.h5'),
+        input_alignment_file=os.path.join(
+            output_folder, 'Alignment.h5'),
+        # Order of combinaions of planes to align, one should start with high resoultion planes (here: telescope planes)
+        align_duts=[[0, 1, 4, 5, 6],  # align the telescope planes first
+                    [7],  # align the time reference after the telescope alignment
+                    [2],
+                    [3]],  # align the DUT last and not with the reference since it is rather small and would make the time reference alinmnt worse
+        # The DUTs to be used in the fit, always just the high resolution Mimosa26 planes used
+        selection_fit_duts=[0, 1, 4, 5, 6],
+        # The DUTs to be required to have a hit for the alignment
+        selection_hit_duts=[[0, 1, 4, 5, 6, 7],  # Take tracks with time reference hit
+                            [0, 1, 4, 5, 6, 7],  # Take tracks with time reference hit
+                            [0, 1, 2, 3, 4, 5, 6],
+                            [0, 1, 3, 4, 5, 6]],
+        # The required track quality per alignment step and DUT
+        selection_track_quality=[[1, 1, 1, 1, 1, 0],  # Do not require a good hit in the time refernce
+                                 [1, 1, 1, 1, 1, 1],
+                                 [1, 1, 1, 1, 1, 1, 1],
+                                 [1, 1, 1, 1, 1, 1]],  # Do not require a good hit in the small DUT
+        # DUTS 2, 3, 7 are heavily rotated (inverted),
+        # this is not implemented now. Thus one has to set
+        # the correct rotation angles here manually, sorry
+        initial_rotation=[[0., 0., 0.],
+                          [0., 0., 0.],
+                          [np.pi, 0., 0.],
+                          [np.pi, 0., 0.],
+                          [0., 0, 0.],
+                          [0., 0, 0.],
+                          [0., 0, 0.],
+                          [0., np.pi, 0.0]],
+        # DUTS 2, 3, 7 are heavily rotated (inverted),
+        # this is not implemented now. Thus one has to set
+        # the correct rotation angles here manually, sorry
+        initial_translation=[[0., 0, 0.],
+                             [0., 0, 0.],
+                             [-883.+0.6, -331.7-2.4-3.6, 0.],
+                             [-591.9+2.2+1.7, -535.3-5.4-6.8, 0.],
+                             [0., 0., 0.],
+                             [0., 0, 0.],
+                             [0., 0, 0.],
+                             [1567.-21.2, -1485.-17.9, 0.]],
+        n_pixels=n_pixels,
+        # Do the alignment only on a subset of data, for reasonable run time
+        use_n_tracks=200000,
+        pixel_size=pixel_size,
+        plot=True)  # Show result residuals after alignment
+
+    # Apply new alignment to data
+    # Revert alignment from track candidates. Usually one would just apply the
+    # alignment to the merged data.
+    # Due to the large beam angle track finding fails on aligned data.
+    # Thus rely on the found tracks from prealignment.
+    dut_alignment.apply_alignment(
+        input_hit_file=os.path.join(output_folder, 'TrackCandidates_prealignment_reduced.h5'),
+        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+        # This is the new not aligned but preselected merged data file to apply (pre-) alignment on
+        output_hit_file=os.path.join(output_folder, 'Merged_small.h5'),
+        inverse=True,
+        force_prealignment=True)
+
+    # Apply the alignment to the merged cluster table to create tracklets
+    dut_alignment.apply_alignment(
+        input_hit_file=os.path.join(output_folder, 'Merged_small.h5'),
+        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+        output_hit_file=os.path.join(output_folder, 'TrackCandidates.h5'))
 
     # Fit track using alignment
     track_analysis.fit_tracks(
         input_track_candidates_file=os.path.join(output_folder,
-                                                 'TrackCandidates_prealignment.h5'),
+                                                 'TrackCandidates.h5'),
         input_alignment_file=os.path.join(output_folder,
                                           'Alignment.h5'),
         output_tracks_file=os.path.join(output_folder,
-                                        'Tracks_prealignment.h5'),
-        fit_duts=[2, 3],
-        selection_hit_duts=[[0, 1, 3, 4, 5, 6, 7], [0, 1, 2, 4, 5, 6, 7]],
+                                        'Tracks.h5'),
+        fit_duts=[2, 3, 4],
+        selection_hit_duts=[[0, 1, 3, 4, 5, 6, 7],
+                            [0, 1, 2, 4, 5, 6, 7],
+                            [0, 1, 4, 5, 6, 7]],
         selection_fit_duts=[0, 1, 4, 5, 6],
-        # Take all tracks with good hits
-        selection_track_quality=1,
-        force_prealignment=True)
+        # Take all tracks with any hits, but good time reference hits
+        selection_track_quality=[[0, 0, 1, 0, 0, 0, 1],
+                                 [0, 0, 1, 0, 0, 0, 1],
+                                 [0, 0, 0, 0, 0, 1]],
+        min_track_distance=True)
 
     # Create unconstrained residuals with aligned data
     result_analysis.calculate_residuals(
-        input_tracks_file=os.path.join(output_folder,
-                                       'Tracks_prealignment.h5'),
-        input_alignment_file=os.path.join(output_folder,
-                                          'Alignment.h5'),
-        output_residuals_file=os.path.join(output_folder,
-                                           'Residuals.h5'),
+        input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
+        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+        output_residuals_file=os.path.join(output_folder, 'Residuals.h5'),
         n_pixels=n_pixels,
-        pixel_size=pixel_size,
-        force_prealignment=True)
+        pixel_size=pixel_size)
 
     # Calculate efficiency with aligned data
     result_analysis.calculate_efficiency(
         input_tracks_file=os.path.join(output_folder,
-                                       'Tracks_prealignment.h5'),
+                                       'Tracks.h5'),
         input_alignment_file=os.path.join(output_folder,
                                           'Alignment.h5'),
         output_efficiency_file=os.path.join(output_folder,
@@ -191,41 +270,8 @@ def run_analysis():
         bin_size=[(50, 50)] * 8,
         pixel_size=pixel_size,
         n_pixels=n_pixels,
-        minimum_track_density=20,
-        # use_duts=[1],
-        force_prealignment=True,
-        sensor_size=[(pixel_size[i][0] * n_pixels[i][0],
-                      pixel_size[i][1] * n_pixels[i][1]) for i in range(8)])
-
-    result_analysis.calculate_efficiency(
-        input_tracks_file=os.path.join(output_folder,
-                                       'Tracks_prealignment.h5'),
-        input_alignment_file=os.path.join(output_folder,
-                                          'Alignment.h5'),
-        output_efficiency_file=os.path.join(output_folder,
-                                            'Efficiency2.h5'),
-        bin_size=[(50, 50)] * 8,
-        pixel_size=pixel_size,
-        n_pixels=n_pixels,
-        minimum_track_density=20,
-        col_range=[(100, 5500),
-                   (100, 5500),
-                   (100, 5500),
-                   (1000, 6000),
-                   (100, 5500),
-                   (100, 5500),
-                   (100, 5500),
-                   (100, 5500)],
-        row_range=[(100, 5500),
-                   (100, 5500),
-                   (2200, 2800),
-                   (2200, 2800),
-                   (100, 5500),
-                   (100, 5500),
-                   (100, 5500),
-                   (100, 5500)],
-        # use_duts=[1],
-        force_prealignment=True,
+        minimum_track_density=1,
+        max_chi2=1000.,
         sensor_size=[(pixel_size[i][0] * n_pixels[i][0],
                       pixel_size[i][1] * n_pixels[i][1]) for i in range(8)])
 
