@@ -25,14 +25,14 @@ def run_analysis():
     # The location of the example data files, one file per DUT
     # Only 8 devices supported yet, skip first
     data_files = [  # The first device is the reference for the coordinate system
-        # os.path.join(data_folder, '37_20170920_sps_m26_telescope_scan_run_aligned_6'),
-        os.path.join(data_folder, 'Data_Telescope/37_20170920_sps_m26_telescope_scan_run_aligned_5.h5'),
-        os.path.join(data_folder, 'Data_Telescope/37_20170920_sps_m26_telescope_scan_run_aligned_4.h5'),
+        # os.path.join(data_folder, '37_20170920_sps_m26_telescope_scan_combined_run_aligned_6'),
+        os.path.join(data_folder, 'Data_Telescope/37_20170920_sps_m26_telescope_scan_combined_run_aligned_5.h5'),
+        os.path.join(data_folder, 'Data_Telescope/37_20170920_sps_m26_telescope_scan_combined_run_aligned_4.h5'),
         os.path.join(data_folder, 'Data_B18/20170921_225457_scan_simple_ev.h5'),  # Mono 1, DUT
         os.path.join(data_folder, 'Data_B19/20170921_225500_scan_simple_ev.h5'),  # Mono 2, reference
-        os.path.join(data_folder, 'Data_Telescope/37_20170920_sps_m26_telescope_scan_run_aligned_3.h5'),
-        os.path.join(data_folder, 'Data_Telescope/37_20170920_sps_m26_telescope_scan_run_aligned_2.h5'),
-        os.path.join(data_folder, 'Data_Telescope/37_20170920_sps_m26_telescope_scan_run_aligned_1.h5'),
+        os.path.join(data_folder, 'Data_Telescope/37_20170920_sps_m26_telescope_scan_combined_run_aligned_3.h5'),
+        os.path.join(data_folder, 'Data_Telescope/37_20170920_sps_m26_telescope_scan_combined_run_aligned_2.h5'),
+        os.path.join(data_folder, 'Data_Telescope/37_20170920_sps_m26_telescope_scan_combined_run_aligned_1.h5'),
         os.path.join(data_folder, 'Data_Telescope/37_20170920_sps_m26_telescope_scan_aligned.h5')]  # FE-I4 time reference]
 
     # Pixel dimesions and matrix size of the DUTs
@@ -59,7 +59,7 @@ def run_analysis():
         "FEI4 Reference",)  # Friendly names for plotting
 
     # Folder where all output data and plots are stored
-    output_folder = r'/media/davidlp/Data new/Monopix_TBA_CERN/20170922_TestBeamSPSdata/Run01_-100V/output/'
+    output_folder = r'/media/davidlp/Data new/Monopix_TBA_CERN/20170922_TestBeamSPSdata/Run01_-100V/output_full/'
 
     data_files[2], data_files[3] = fix_mono_data(data_files=[data_files[2],
                                                              data_files[3]])
