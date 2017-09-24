@@ -1,6 +1,7 @@
 ''' Implements the often needed split, map, combine paradigm '''
 from __future__ import division
 
+import os
 import shutil
 import tempfile
 from collections import Iterable
@@ -292,6 +293,7 @@ class SMC(object):
                         tmp_node = in_file.get_node(in_file.root, node_name)
                         for i in range(0, tmp_node.shape[0], self.chunk_size):
                             node.append(tmp_node[i: i + self.chunk_size])
+                    os.remove(f)
         else:  # TODO: solution without having all hists in RAM
             # Only one file, merging not needed
             if len(self.tmp_files) == 1:
@@ -320,6 +322,7 @@ class SMC(object):
                                 # Add array, ignore size
                                 tmp_data.resize(hist_data.shape)
                                 hist_data += tmp_data
+                        os.remove(f)
     
                     dt = hist_data.dtype
                     out = out_file.create_carray(out_file.root,
