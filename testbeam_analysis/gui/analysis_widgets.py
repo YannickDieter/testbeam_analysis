@@ -422,9 +422,9 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.analysis_worker = AnalysisWorker(func=self._call_func, funcs_args=self.calls.iteritems())
         self.analysis_worker.moveToThread(self.analysis_thread)
 
-        # Connect workers work method to the start of the thread, quit thread when worker finishes
-        self.analysis_worker.finished.connect(self.analysis_thread.quit)
-        self.analysis_thread.started.connect(self.analysis_worker.work)
+        # Connect worker's status
+        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setRange(0, len(self.calls.keys())))
+        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setValue(i))
 
         # Connect exceptions signal
         self.analysis_worker.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
@@ -432,9 +432,12 @@ class AnalysisWidget(QtWidgets.QWidget):
                                                                                             name=self.name,
                                                                                             cause='analysis'))
 
-        self.analysis_worker.finished.connect(lambda: self.emit_analysis_done())
-        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setRange(0, len(self.calls.keys())))
-        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setValue(i))
+        # Connect workers work method to the start of the thread, quit thread when worker finishes and clean-up
+        self.analysis_thread.started.connect(self.analysis_worker.work)
+        self.analysis_worker.finished.connect(self.emit_analysis_done)
+        self.analysis_worker.finished.connect(self.analysis_thread.quit)
+        self.analysis_worker.finished.connect(self.analysis_worker.deleteLater)
+        self.analysis_thread.finished.connect(self.analysis_thread.deleteLater)
 
         # Start thread
         self.analysis_thread.start()
@@ -684,9 +687,9 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                                               funcs_args=self.parallel_calls.iteritems())
         self.analysis_worker.moveToThread(self.analysis_thread)
 
-        # Connect workers work method to the start of the thread, quit thread when worker finishes
-        self.analysis_worker.finished.connect(self.analysis_thread.quit)
-        self.analysis_thread.started.connect(self.analysis_worker.work)
+        # Connect worker's status
+        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setRange(0, len(self.tw.keys())))
+        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setValue(i))
 
         # Connect exceptions signal
         self.analysis_worker.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
@@ -694,9 +697,12 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                                                                                             name=self.name,
                                                                                             cause='analysis'))
 
-        self.analysis_worker.finished.connect(lambda: self.emit_parallel_analysis_done())
-        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setRange(0, len(self.tw.keys())))
-        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setValue(i))
+        # Connect workers work method to the start of the thread, quit thread when worker finishes and clean-up
+        self.analysis_thread.started.connect(self.analysis_worker.work)
+        self.analysis_worker.finished.connect(self.emit_parallel_analysis_done)
+        self.analysis_worker.finished.connect(self.analysis_thread.quit)
+        self.analysis_worker.finished.connect(self.analysis_worker.deleteLater)
+        self.analysis_thread.finished.connect(self.analysis_thread.deleteLater)
 
         # Start thread
         self.analysis_thread.start()
