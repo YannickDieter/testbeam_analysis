@@ -56,7 +56,7 @@ class SMC(object):
                 Name/Filters/Title values are deduced from the input table
                 if not defined. Data type is deduced from resulting data
                 format if not defined.
-                
+
                 Example:
                 node_desc = {'name': test}
                 Would create an output node with the name test, the title and
@@ -208,8 +208,10 @@ class SMC(object):
                 # Create result table with specified data format
                 # From given pytables tables description
                 if 'description' in node_desc:
-                    table_out = out_file.create_table(out_file.root,
-                                                      **node_desc)
+                    table_out = out_file.create_table(
+                        out_file.root,
+                        expectedrows=self.chunk_size,
+                        **node_desc)
                 # Data format unknown and has to be determined later
                 # and thus the table has to be created later
                 else:
@@ -228,9 +230,11 @@ class SMC(object):
                     if not table_out:
                         if data_ret.dtype.names:  # Recarray thus table needed
                             dcr = data_ret.dtype
-                            table_out = out_file.create_table(out_file.root,
-                                                              description=dcr,
-                                                              **node_desc)
+                            table_out = out_file.create_table(
+                                out_file.root,
+                                description=dcr,
+                                expectedrows=self.chunk_size,
+                                **node_desc)
                         # Create histogram if data is not a table
                         elif hist_out is None:
                             # Copy needed for reshape
@@ -295,13 +299,14 @@ class SMC(object):
         else:  # TODO: solution without having all hists in RAM
             # Only one file, merging not needed
             if len(self.tmp_files) == 1:
-                shutil.move(self.tmp_files[0], self.file_out)   
+                shutil.move(self.tmp_files[0], self.file_out)
             else:  # Several files, merge them by adding up
                 with tb.open_file(self.file_out, 'w') as out_file:
                     hist_data = None
                     for f in self.tmp_files:
                         with tb.open_file(f) as in_file:
-                            tmp_data = in_file.get_node(in_file.root, node_name)[:]
+                            tmp_data = in_file.get_node(in_file.root,
+                                                        node_name)[:]
                             if hist_data is None:
                                 # Copy needed for reshape
                                 hist_data = tmp_data.copy()
@@ -314,13 +319,13 @@ class SMC(object):
                                         shape.append(tmp_data.shape[i])
                                     else:
                                         shape.append(hist_data.shape[i])
-        
+
                                 hist_data.resize(shape)
-        
+
                                 # Add array, ignore size
                                 tmp_data.resize(hist_data.shape)
                                 hist_data += tmp_data
-    
+
                     dt = hist_data.dtype
                     out = out_file.create_carray(out_file.root,
                                                  atom=tb.Atom.from_dtype(dt),
