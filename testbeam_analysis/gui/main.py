@@ -1,6 +1,5 @@
 import sys
 import logging
-import time
 import platform
 
 from email import message_from_string
@@ -643,32 +642,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 self.p_bar_rca.setDisabled(True)
 
             else:
-                # Get thread status of every analysis thread
-                analysis_threads = [self.tw[key].analysis_thread.isRunning() for key in self.tab_order[2:]]
-
-                # If any of them is still running, wait for them to finish before starting next tab
-                if any(analysis_threads):
-
-                    # Get running threads
-                    running_threads = []
-                    for i, thread in enumerate(analysis_threads):
-                        if thread and self.tab_order[i + 2] not in running_threads:
-                            running_threads.append(self.tab_order[i + 2])
-                        else:
-                            pass
-
-                    msg = "Waiting for %s analysis thread to finish" % (', '.join(running_threads))
-                    logging.info(msg=msg)
-
-                    # Wait until every thread has finished
-                    wait_begin = time.time()
-                    while any(analysis_threads):
-                        analysis_threads = [self.tw[key].analysis_thread.isRunning() for key in self.tab_order[2:]]
-                    wait_end = time.time()
-
-                    msg = "Waited %f seconds for %s analysis thread to finish" % (wait_end-wait_begin,
-                                                                                  ', '.join(running_threads))
-                    logging.info(msg=msg)
 
                 if self.flag_interrupt:
 
