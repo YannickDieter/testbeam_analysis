@@ -15,6 +15,7 @@
 '''
 
 import os
+import shutil
 import logging
 
 import numexpr  # BUG: right now with anaconda this needs to be there
@@ -68,15 +69,12 @@ def interpret_anemone_data(raw_data_files):
 
 def combine_raw_data(raw_data_files, chunksize=10000000):
     file_combined = raw_data_files[0][:-3] + '_combined.h5'
-    with tb.open_file(raw_data_files[0][:-3] + '_combined.h5', 'w') as out_f:
-        combined_table = None
+    # Use first tmp file as result file
+    shutil.move(raw_data_files[0], file_combined)
+    with tb.open_file(raw_data_files[0][:-3] + '_combined.h5', 'r+') as out_f:
+        combined_data = in_f.root.raw_data
         status = 0
-        for raw_data_file in raw_data_files:
-            with tb.open_file(raw_data_file) as in_f:
-                for chunk in range(0, in_f.root.raw_data.shape[0], chunksize):
-                    data = in_f.root.raw_data[chunk:chunk + chunksize]
-                    if combined_table is None:
-                        progress_bar = progressbar.ProgressBar(
+        progress_bar = progressbar.ProgressBar(
                             widgets=['',
                                      progressbar.Percentage(),
                                      ' ',
@@ -85,19 +83,14 @@ def combine_raw_data(raw_data_files, chunksize=10000000):
                                                      right='|'),
                                      ' ',
                                      progressbar.AdaptiveETA()],
-                            maxval=in_f.root.raw_data.shape[0] * len(raw_data_files) + chunksize,
+                            maxval=in_f.root.raw_data.shape[0] * (len(raw_data_files) - 1) + chunksize,
                             term_width=80)
-                        progress_bar.start()
-                        node = in_f.root.raw_data
-                        combined_table = out_f.create_earray(
-                            out_f.root,
-                            name=node.name,
-                            atom=node.atom,
-                            shape=(0, ),
-                            expectedrows=chunksize,
-                            title=node.title,
-                            filters=node.filters)
-                    combined_table.append(data)
+        progress_bar.start()
+        for raw_data_file in raw_data_files[1:]:
+            with tb.open_file(raw_data_file) as in_f:
+                for chunk in range(0, in_f.root.raw_data.shape[0], chunksize):
+                    data = in_f.root.raw_data[chunk:chunk + chunksize]    
+                    combined_data.append(data)
                     status += chunksize
                     progress_bar.update(status)
         progress_bar.finish()
