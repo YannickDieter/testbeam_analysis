@@ -784,7 +784,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
     def closeEvent(self, _):
         self.file_quit()
 
-if __name__ == '__main__':
+def main():
     app = QtWidgets.QApplication(sys.argv)
     font = QtGui.QFont()
     font.setPointSize(11)
@@ -793,3 +793,6 @@ if __name__ == '__main__':
     aw.show()
     aw.check_resolution()
     sys.exit(app.exec_())
+
+if __name__ == '__main__':
+    main()
