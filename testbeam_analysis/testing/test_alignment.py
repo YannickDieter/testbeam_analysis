@@ -18,8 +18,9 @@ class TestAlignmentAnalysis(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if os.getenv('TRAVIS', False):
-            from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
+        # virtual X server for plots under headless LINUX travis testing is needed
+        if os.getenv('TRAVIS', False) and os.getenv('TRAVIS_OS_NAME', False) == 'linux':
+            from xvfbwrapper import Xvfb
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
         # Define test data input files, download if needed
