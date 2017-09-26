@@ -56,5 +56,11 @@ setup(
     include_dirs=[np.get_include()],
     cmdclass={'build_ext': build_ext_opt},
     keywords=['testbeam', 'particle', 'reconstruction', 'pixel', 'detector'],
-    platforms='any'
+    platforms='any',
+    entry_points={
+          'console_scripts': [
+              'tba = testbeam_analysis.gui.main:main',
+              'testbeam_analysis = testbeam_analysis.gui.main:main'
+          ]
+      },
 )
