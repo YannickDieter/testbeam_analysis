@@ -1,7 +1,14 @@
-language: python
-python:
-  - 2.7
-  - 3.6
+# language: python sets up virtualenv and pip that we don't need.
+# omitting language gives us ruby stuff. c seems likely to be a minimal setup.
+language: c
+# this is here to avoid a hang with python 2.7, suggested in
+# https://github.com/travis-ci/travis-ci/issues/6861
+sudo: required
+
+env:
+  # All supported python versions
+  - TRAVIS_PYTHON_VERSION=2.7
+  - TRAVIS_PYTHON_VERSION=3.6
 
 os:
   - linux
@@ -37,9 +44,13 @@ before_install:
   - chmod +x miniconda.sh
   - bash miniconda.sh -b -p $HOME/miniconda
   - source "$HOME"/miniconda/bin/activate root
-  - conda update --yes conda
+  - conda config --set always_yes yes
+  - conda update conda
   - conda info -a
-  - conda install --yes numpy cython pytables scipy matplotlib nose numba mock pytest-cov pyyaml
+  - conda create -q -n test-environment python="$TRAVIS_PYTHON_VERSION" pip
+  - source activate test-environment
+  - printenv | sort
+  - conda install numpy cython pytables scipy matplotlib nose numba mock pytest-cov pyyaml
   - pip install progressbar-latest xvfbwrapper coverage python-coveralls pixel_clusterizer pylandau pytest
   - pip install -r requirements_docs.txt
   - python setup.py develop
