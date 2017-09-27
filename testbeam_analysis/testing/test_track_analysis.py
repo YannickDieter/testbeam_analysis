@@ -16,6 +16,7 @@ class TestTrackAnalysis(unittest.TestCase):
     def setUpClass(cls):
         # virtual X server for plots under headless LINUX travis testing is needed
         if os.getenv('TRAVIS', False) and os.getenv('TRAVIS_OS_NAME', False) == 'linux':
+            from xvfbwrapper import Xvfb
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
         cls.output_folder = 'tmp_track_test_output'
