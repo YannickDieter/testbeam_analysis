@@ -381,6 +381,8 @@
 <span class="sd">        If it is true the std setting of 200 um is used. Otherwise a distance in um for each DUT has to be given.</span>
 <span class="sd">        e.g.: For two devices: min_track_distance = (50, 250)</span>
 <span class="sd">        If False, the minimum track distance is not considered.</span>
+<span class="sd">    chunk_size : uint</span>
+<span class="sd">        Chunk size of the data when reading from file.</span>
 <span class="sd">    &#39;&#39;&#39;</span>
 
     <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;=== Fitting tracks (Method: </span><span class="si">%s</span><span class="s1">) ===&#39;</span> <span class="o">%</span> <span class="n">method</span><span class="p">)</span>
@@ -1312,7 +1314,6 @@
 
     <span class="k">if</span> <span class="n">add_scattering_plane</span><span class="p">:</span>
         <span class="c1"># initialize scattering plane values</span>
-        <span class="n">index_scatter</span> <span class="o">=</span> <span class="n">add_scattering_plane</span><span class="p">[</span><span class="s1">&#39;index_scatter&#39;</span><span class="p">]</span>
         <span class="n">z_scatter</span> <span class="o">=</span> <span class="n">add_scattering_plane</span><span class="p">[</span><span class="s1">&#39;z_scatter&#39;</span><span class="p">]</span>
         <span class="n">index_scatter</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">z_positions</span><span class="p">,</span> <span class="n">z_scatter</span><span class="p">))</span> <span class="o">==</span> <span class="n">z_scatter</span><span class="p">[</span><span class="n">i</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">z_scatter</span><span class="p">))]</span>
         <span class="n">material_budget_scatter</span> <span class="o">=</span> <span class="n">add_scattering_plane</span><span class="p">[</span><span class="s1">&#39;material_budget_scatter&#39;</span><span class="p">]</span>
