@@ -18,9 +18,8 @@ class TestHitAnalysis(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
-        if os.getenv('TRAVIS', False):
-            # virtual X server for plots under headless LINUX travis testing is
-            # needed
+        # virtual X server for plots under headless LINUX travis testing is needed
+        if os.getenv('TRAVIS', False) and os.getenv('TRAVIS_OS_NAME', False) == 'linux':
             from xvfbwrapper import Xvfb
             self.vdisplay = Xvfb()
             self.vdisplay.start()

@@ -64,8 +64,8 @@ class TestExamples(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # Virtual X server for plots under headless LINUX travis testing needed
-        if os.getenv('TRAVIS', False):
+        # virtual X server for plots under headless LINUX travis testing is needed
+        if os.getenv('TRAVIS', False) and os.getenv('TRAVIS_OS_NAME', False) == 'linux':
             from xvfbwrapper import Xvfb
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
