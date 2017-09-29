@@ -1,6 +1,6 @@
 # Language: python sets up virtualenv and pip that we don't need and
 # osx builders does not support: https://github.com/travis-ci/travis-ci/issues/2312
-language: generic
+
 
 # TBA needs > 4 Gb system, selecting sudo
 # Increases available RAM to 7.5 Gb
@@ -9,39 +9,24 @@ sudo: true
 
 matrix:
   include:
-    # works on Precise and Trusty
     - os: linux
+      language: python
       dist: trusty
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-4.9
       env:
-         - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
          - TRAVIS_PYTHON_VERSION=2.7
-    # works on Precise and Trusty
     - os: linux
-      dist: trusty
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-4.9
+      language: python
       env:
-         - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
          - TRAVIS_PYTHON_VERSION=3.6
     - os: osx
+      language: generic
       osx_image: xcode8
       env:
-        - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
         - TRAVIS_PYTHON_VERSION=2.7
     - os: osx
+      language: generic
       osx_image: xcode8
       env:
-        - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
         - TRAVIS_PYTHON_VERSION=3.6
 
 notifications:
@@ -55,7 +40,6 @@ cache:
  
 # Setup gcc 4.9 compiler and miniconda python with needed packages
 before_install:
-#  - eval "${MATRIX_EVAL}"
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
         MINICONDA_OS=Linux ;
       else
@@ -74,9 +58,9 @@ before_install:
   - conda update conda
   - conda info -a
   #- conda create -q -n tba python="$TRAVIS_PYTHON_VERSION" pip
-  - python -c "from distutils import sysconfig;print sysconfig.get_config_var('LDSHARED')"
+  - python -c "from distutils import sysconfig;print(sysconfig.get_config_var('LDSHARED'))"
   #- source activate tba
-  #- python -c "from distutils import sysconfig;print sysconfig.get_config_var('LDSHARED')"
+  #- python -c "from distutils import sysconfig;print(sysconfig.get_config_var('LDSHARED'))"
   - conda install numpy cython pytables scipy matplotlib nose numba mock pytest-cov pyyaml
   # - https://bugs.python.org/issue30915
   - pip install --upgrade pip
