@@ -71,13 +71,16 @@ before_install:
   - conda config --set always_yes yes
   - conda update conda
   - conda info -a
-  - conda create -q -n test-environment python="$TRAVIS_PYTHON_VERSION" pip
-  - source activate test-environment
-  - printenv | sort
+  - conda create -q -n tba python="$TRAVIS_PYTHON_VERSION" pip
+  - python -c "from distutils import sysconfig;print sysconfig.get_config_var('LDSHARED')"
+  - source activate tba
+  - python -c "from distutils import sysconfig;print sysconfig.get_config_var('LDSHARED')"
   - conda install numpy cython pytables scipy matplotlib nose numba mock pytest-cov pyyaml
+  - pip install --upgrade pip
   - pip install progressbar-latest xvfbwrapper coverage python-coveralls pixel_clusterizer pylandau pytest
   - pip install -r requirements_docs.txt
   - python setup.py develop
+  - printenv | sort
 
 # Run test
 script:
