@@ -51,6 +51,7 @@ notifications:
 cache:
   directories:
   - $HOME/.pip-cache/
+
  
 # Setup gcc 4.9 compiler and miniconda python with needed packages
 before_install:
@@ -67,15 +68,17 @@ before_install:
     fi
   - chmod +x miniconda.sh
   - bash miniconda.sh -b -p $HOME/miniconda
-  - source "$HOME"/miniconda/bin/activate root
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  # - source "$HOME"/miniconda/bin/activate root
   - conda config --set always_yes yes
   - conda update conda
   - conda info -a
-  - conda create -q -n tba python="$TRAVIS_PYTHON_VERSION" pip
+  #- conda create -q -n tba python="$TRAVIS_PYTHON_VERSION" pip
   - python -c "from distutils import sysconfig;print sysconfig.get_config_var('LDSHARED')"
-  - source activate tba
-  - python -c "from distutils import sysconfig;print sysconfig.get_config_var('LDSHARED')"
+  #- source activate tba
+  #- python -c "from distutils import sysconfig;print sysconfig.get_config_var('LDSHARED')"
   - conda install numpy cython pytables scipy matplotlib nose numba mock pytest-cov pyyaml
+  # - https://bugs.python.org/issue30915
   - pip install --upgrade pip
   - pip install progressbar-latest xvfbwrapper coverage python-coveralls pixel_clusterizer pylandau pytest
   - pip install -r requirements_docs.txt
