@@ -1,6 +1,6 @@
-# Language: python sets up virtualenv and pip that we don't need and
-# osx builders does not support: https://github.com/travis-ci/travis-ci/issues/2312
-
+# We use miniconda python and python with travis workers under osx is not supported
+# https://github.com/travis-ci/travis-ci/issues/2312
+language: generic
 
 # TBA needs > 4 Gb system, selecting sudo
 # Increases available RAM to 7.5 Gb
@@ -10,21 +10,18 @@ sudo: true
 matrix:
   include:
     - os: linux
-      language: python
       dist: trusty
       env:
          - TRAVIS_PYTHON_VERSION=2.7
     - os: linux
-      language: python
+      dist: trusty
       env:
          - TRAVIS_PYTHON_VERSION=3.6
     - os: osx
-      language: generic
       osx_image: xcode8
       env:
         - TRAVIS_PYTHON_VERSION=2.7
     - os: osx
-      language: generic
       osx_image: xcode8
       env:
         - TRAVIS_PYTHON_VERSION=3.6
@@ -37,8 +34,7 @@ cache:
   directories:
   - $HOME/.pip-cache/
 
- 
-# Setup gcc 4.9 compiler and miniconda python with needed packages
+# Setup miniconda python with needed packages
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
         MINICONDA_OS=Linux ;
@@ -53,17 +49,12 @@ before_install:
   - chmod +x miniconda.sh
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
-  # - source "$HOME"/miniconda/bin/activate root
   - conda config --set always_yes yes
-  # https://github.com/travis-ci/travis-ci/issues/8512
-  # - conda update conda
+  # - conda update conda  # https://github.com/travis-ci/travis-ci/issues/8512
   - conda info -a
-  #- conda create -q -n tba python="$TRAVIS_PYTHON_VERSION" pip
-  - python -c "from distutils import sysconfig;print(sysconfig.get_config_var('LDSHARED'))"
-  #- source activate tba
-  #- python -c "from distutils import sysconfig;print(sysconfig.get_config_var('LDSHARED'))"
+  - conda create -q -n tba python="$TRAVIS_PYTHON_VERSION" pip
+  - source activate tba
   - conda install numpy cython pytables scipy matplotlib nose numba mock pytest-cov pyyaml
-  # - https://bugs.python.org/issue30915
   - pip install --upgrade pip
   - pip install progressbar-latest xvfbwrapper coverage python-coveralls pixel_clusterizer pylandau pytest
   - pip install -r requirements_docs.txt
