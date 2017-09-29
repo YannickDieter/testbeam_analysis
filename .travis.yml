@@ -1,25 +1,48 @@
-# language: python sets up virtualenv and pip that we don't need.
-# omitting language gives us ruby stuff. c seems likely to be a minimal setup.
+# Language: python sets up virtualenv and pip that we don't need and
+# osx builders does not support: https://github.com/travis-ci/travis-ci/issues/2312
 language: cpp
-# this is here to avoid a hang with python 2.7, suggested in
-# https://github.com/travis-ci/travis-ci/issues/6861
-sudo: required
 
-env:
-  # All supported python versions
-  - TRAVIS_PYTHON_VERSION=2.7
-  - TRAVIS_PYTHON_VERSION=3.6
-
-os:
-  - linux
-  - osx
- 
 # TBA needs > 4 Gb system, selecting sudo
 # Increases available RAM to 7.5 Gb
 # https://docs.travis-ci.com/user/reference/overview/
 sudo: true
 
-dist: trusty
+matrix:
+  include:
+    # works on Precise and Trusty
+    - os: linux
+      dist: trusty
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-4.9
+      env:
+         - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
+         - TRAVIS_PYTHON_VERSION=2.7
+    # works on Precise and Trusty
+    - os: linux
+      dist: trusty
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-4.9
+      env:
+         - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
+         - TRAVIS_PYTHON_VERSION=3.6
+    - os: osx
+      osx_image: xcode8
+      env:
+        - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
+        - TRAVIS_PYTHON_VERSION=2.7
+    - os: osx
+      osx_image: xcode8
+      env:
+        - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
+        - TRAVIS_PYTHON_VERSION=3.6
 
 notifications:
   email:
@@ -29,8 +52,9 @@ cache:
   directories:
   - $HOME/.pip-cache/
  
-# Setup miniconda python with needed packages
+# Setup gcc 4.9 compiler and miniconda python with needed packages
 before_install:
+  - eval "${MATRIX_EVAL}"
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
         MINICONDA_OS=Linux ;
       else
