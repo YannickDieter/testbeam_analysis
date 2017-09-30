@@ -2,8 +2,6 @@
 All sub-windows of the AnalysisWindow are implemented here. One for global settings and one for exceptions
 """
 
-import yaml
-
 from PyQt5 import QtCore, QtWidgets, QtGui
 from copy import deepcopy
 
@@ -262,10 +260,16 @@ class ExceptionWindow(QtWidgets.QMainWindow):
         trcbck_path = QtWidgets.QFileDialog.getSaveFileName(parent=self,
                                                             caption=caption,
                                                             directory='./',
-                                                            filter='*.yaml')[0]
+                                                            filter='*.txt')[0]
+
         if trcbck_path:
+
+            if 'txt' not in trcbck_path.split('.'):
+                trcbck_path += '.txt'
+
             with open(trcbck_path, 'w') as f_write:
-                yaml.dump(self.traceback, f_write, default_flow_style=False)
+                f_write.write('{}'.format(self.traceback))
+
         else:
             pass
 
