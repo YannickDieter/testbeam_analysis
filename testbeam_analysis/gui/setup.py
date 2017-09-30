@@ -1,4 +1,5 @@
 import yaml
+import os
 from PyQt5 import QtCore, QtWidgets, QtGui
 
 
@@ -53,17 +54,20 @@ class SetupTab(QtWidgets.QWidget):
         self._scatter_widgets = {}
 
         # Counter for scatter planes
-        self.n_sct_plns = 0
+        self._n_sct_plns = 0
 
         # Store state of setup
         self.isFinished = False
 
         # TabIcon related variable
-        self.style = QtWidgets.qApp.style()
+        self._style = QtWidgets.qApp.style()
+
+        # Path to predefined dut types yaml
+        self._types_yaml = os.path.join(os.path.dirname(__file__), 'dut_types.yaml')
 
         # Load predefined dut types from file
         try:
-            with open('dut_types.yaml', 'r') as f_read:
+            with open(self._types_yaml, 'r') as f_read:
                 self._dut_types = yaml.load(f_read)
         except IOError:
             pass
@@ -95,7 +99,7 @@ class SetupTab(QtWidgets.QWidget):
         btn_scatter = QtWidgets.QToolButton()
         btn_scatter.setText('+ Scatter plane')
         btn_scatter.setToolTip('Add a passive plane e.g. multiple scatter plane to the setup')
-        btn_scatter.clicked.connect(lambda: self._add_dut(dut_name='Sct_%i' % self.n_sct_plns, scatter_plane=True))
+        btn_scatter.clicked.connect(lambda: self._add_dut(dut_name='Sct_%i' % self._n_sct_plns, scatter_plane=True))
         btn_scatter.clicked.connect(lambda: self._check_input())
         self.tabs.setCornerWidget(btn_scatter)
 
@@ -385,7 +389,7 @@ class SetupTab(QtWidgets.QWidget):
 
         else:
 
-            self.n_sct_plns += 1
+            self._n_sct_plns += 1
 
             layout_props.addWidget(label_budget, 0, 0, 1, 1)
             layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 0, 1, 1, 1)
@@ -617,9 +621,9 @@ class SetupTab(QtWidgets.QWidget):
 
             # Safe updated self._dut_types dict to file and reload
             try:
-                with open('dut_types.yaml', 'w') as f_write:
+                with open(self._types_yaml, 'w') as f_write:
                     yaml.safe_dump(self._dut_types, f_write, default_flow_style=False)
-                with open('dut_types.yaml', 'r') as f_read:
+                with open(self._types_yaml, 'r') as f_read:
                     self._dut_types = yaml.load(f_read)
                 if remove:
                     message = 'Successfully removed DUT type "%s" from predefined DUT types' % custom
@@ -805,12 +809,12 @@ class SetupTab(QtWidgets.QWidget):
 
                 # Set TabIcons to respective duts tab to visualize whether input parameters are correct
                 if dut in broken_input:
-                    icon = self.style.standardIcon(self.style.SP_DialogCancelButton)
+                    icon = self._style.standardIcon(self._style.SP_DialogCancelButton)
                     self.tabs.setTabIcon(dut_list.index(dut), icon)
                     self.tabs.setTabToolTip(dut_list.index(dut), 'Fill in required information')
 
                 else:
-                    icon = self.style.standardIcon(self.style.SP_DialogApplyButton)
+                    icon = self._style.standardIcon(self._style.SP_DialogApplyButton)
                     self.tabs.setTabIcon(dut_list.index(dut), icon)
                     self.tabs.setTabToolTip(dut_list.index(dut), 'Ready')
 

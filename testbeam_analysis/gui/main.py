@@ -1,6 +1,7 @@
 import sys
 import logging
 import platform
+import time
 
 from email import message_from_string
 from pkg_resources import get_distribution, DistributionNotFound
@@ -642,6 +643,27 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 self.p_bar_rca.setDisabled(True)
 
             else:
+
+                # Get thread status of current analysis thread
+                current_thread = self.tw[self.p_bar_rca.text()].analysis_thread
+
+                # If running, quit and wait for it to finish before starting next tab
+                if current_thread.isRunning():
+
+                    # Call the threads quit method again to ensure it to finfish
+                    current_thread.quit()
+
+                    msg = "Waiting for %s analysis thread to finish" % self.p_bar_rca.text()
+                    logging.info(msg=msg)
+
+                    # Wait until every thread has finished
+                    start = time.time()
+                    while current_thread.isRunning():
+                        current_thread = self.tw[self.p_bar_rca.text()].analysis_thread#.isRunning()
+                    end = time.time()
+
+                    msg = "Waited %f seconds for %s analysis thread to finish" % (end - start, self.p_bar_rca.text())
+                    logging.info(msg=msg)
 
                 if self.flag_interrupt:
 
