@@ -7,11 +7,11 @@ from pkg_resources import get_distribution, DistributionNotFound
 
 from PyQt5 import QtCore, QtWidgets, QtGui
 
-from data import DataTab
-from setup import SetupTab
-from sub_windows import SettingsWindow, ExceptionWindow
-from analysis_logger import AnalysisLogger, AnalysisStream
 import testbeam_analysis
+from testbeam_analysis.gui.sub_windows import SettingsWindow, ExceptionWindow
+from testbeam_analysis.gui.analysis_logger import AnalysisLogger, AnalysisStream
+from testbeam_analysis.gui.data import DataTab
+from testbeam_analysis.gui.setup import SetupTab
 from testbeam_analysis.gui import tab_widget
 
 PROJECT_NAME = 'Testbeam Analysis'
