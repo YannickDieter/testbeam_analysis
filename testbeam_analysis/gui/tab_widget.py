@@ -100,7 +100,8 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
                       lambda: self._connect_vitables(files=self.output_files),
                       lambda: self.plot(input_files=self.output_files,
                                         plot_func=plot_masked_pixels,
-                                        dut_names=self.duts)]:
+                                        dut_names=self.duts,
+                                        gui=True)]:
                 self.parallelAnalysisDone.connect(x)
 
             # Start masking
@@ -153,7 +154,8 @@ class ClusterPixelsTab(ParallelAnalysisWidget):
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_files),
                   lambda: self.plot(input_files=output_files,
-                                    plot_func=plot_cluster_size)]:
+                                    plot_func=plot_cluster_size,
+                                    gui=True)]:
             self.parallelAnalysisDone.connect(x)
 
 
@@ -256,7 +258,7 @@ class PrealignmentTab(AnalysisWidget):
         multiple_plotting_figs = {'correlation': None, 'prealignment': self.return_values}
 
         self.plot(input_file=multiple_plotting_data, plot_func=multiple_plotting_func,
-                  figures=multiple_plotting_figs, correlation={'dut_names': self.setup['dut_names']})
+                  figures=multiple_plotting_figs, correlation={'dut_names': self.setup['dut_names'], 'gui': True})
 
 
 class TrackFindingTab(AnalysisWidget):
@@ -293,7 +295,7 @@ class TrackFindingTab(AnalysisWidget):
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file),
-                  lambda: self.plot(input_file=output_file, plot_func=plot_tracks_per_event)]:
+                  lambda: self.plot(input_file=output_file, plot_func=plot_tracks_per_event, gui=True)]:
             self.analysisDone.connect(x)
 
 
@@ -519,12 +521,13 @@ class TrackFittingTab(AnalysisWidget):
         multiple_plotting_func = {'Tracks': plot_events, 'Tracks_per_event': plot_tracks_per_event,
                                   'Track_density': plot_track_density}
 
-        multiple_plotting_kwargs = {'Tracks': {'n_tracks': 20, 'max_chi2': 100000},
+        multiple_plotting_kwargs = {'Tracks': {'n_tracks': 20, 'max_chi2': 100000, 'gui': True},
                                     'Track_density': {'z_positions': setup['z_positions'],
                                                       'dim_x': [setup['n_pixels'][i][0] for i in range(setup['n_duts'])],
                                                       'dim_y': [setup['n_pixels'][i][1] for i in range(setup['n_duts'])],
                                                       'pixel_size': setup['pixel_size'],
-                                                      'max_chi2': 100000}}
+                                                      'max_chi2': 100000, 'gui': True},
+                                    'Tracks_per_event': {'gui': True}}
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file),
@@ -597,6 +600,7 @@ class ResidualTab(AnalysisWidget):
             plot_func[dut] = None
             figs[dut] = self.return_values[16 * i: 16 * (i + 1)]  # 16 figures per DUT
 
+        # gui=True not needed and not possible since no function is called whose args can be inspected.
         self.plot(input_file=input_files, plot_func=plot_func, figures=figs)
 
 
@@ -677,4 +681,5 @@ class EfficiencyTab(AnalysisWidget):
             plot_func[dut] = None
             figs[dut] = self.return_values[5 * i: 5 * (i + 1)]  # 5 figures per DUT
 
+            # gui=True not needed and not possible since no function is called whose args can be inspected.
         self.plot(input_file=input_files, plot_func=plot_func, figures=figs)

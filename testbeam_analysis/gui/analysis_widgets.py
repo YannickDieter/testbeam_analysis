@@ -603,7 +603,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                         tmp_setup[s_key] = [self.setup[s_key][i]]  # FIXME: Does not work properly without list
                     else:
                         tmp_setup[s_key] = self.setup[s_key][i]
-                elif isinstance(self.setup[s_key], int) or isinstance(self.setup[s_key], str):
+                else:  # isinstance(self.setup[s_key], int) or isinstance(self.setup[s_key], str):
                     tmp_setup[s_key] = self.setup[s_key]
 
             for o_key in self.options.keys():
@@ -613,7 +613,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                         tmp_options[o_key] = [self.options[o_key][i]]  # FIXME: Does not work properly without list
                     else:
                         tmp_options[o_key] = self.options[o_key][i]
-                elif isinstance(self.options[o_key], int) or isinstance(self.options[o_key], str):
+                else:  # isinstance(self.options[o_key], int) or isinstance(self.options[o_key], str):
                     tmp_options[o_key] = self.options[o_key]
 
             widget = AnalysisWidget(parent=self.tabs, setup=tmp_setup, options=tmp_options, name=self.name,

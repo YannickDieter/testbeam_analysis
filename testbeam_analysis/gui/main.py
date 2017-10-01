@@ -432,6 +432,13 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         for tab in self.tab_order:
             if tab in tmp_tw.keys():
 
+                # If analysis is running, don't update tab
+                try:
+                    if self.tw[tab].analysis_thread.isRunning():
+                        continue
+                except AttributeError:
+                    pass
+
                 # Replace tabs in self.tw with updated tabs
                 self.tw[tab] = tmp_tw[tab]
 
@@ -574,6 +581,11 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             logging.warning(msg=msg)
             return
 
+        # Disable settings during consecutive analysis
+        self.settings_menu.actions()[0].setEnabled(False)
+        self.settings_menu.setToolTipsVisible(True)
+        self.settings_menu.actions()[0].setToolTip('Settings cannot be changed during consecutive analysis')
+
         # Whenever starting rca restore flag state
         self.flag_interrupt = False
 
@@ -631,6 +643,11 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             if tab_list is None and not interrupt:
                 return
 
+            if isinstance(tab_list, list):
+                tab_name = tab_list[0]
+            else:
+                tab_name = tab_list
+
             # If interrupt btn was clicked set flag
             if interrupt:
                 self.flag_interrupt = True
@@ -644,55 +661,56 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
             else:
 
-                # Get thread status of current analysis thread
-                current_thread = self.tw[self.p_bar_rca.text()].analysis_thread
+                if tab_name in self.tab_order:
 
-                # If running, quit and wait for it to finish before starting next tab
-                if current_thread.isRunning():
+                    # Get thread status of current analysis thread
+                    current_tab = self.tab_order[self.tab_order.index(tab_name) - 1]
+                    print current_tab, self.p_bar_rca.text()
+                    current_thread = self.tw[current_tab].analysis_thread
 
-                    # Call the threads quit method again to ensure it to finfish
-                    current_thread.quit()
+                    # If running, quit and wait for it to finish before starting next tab
+                    if current_thread.isRunning():
 
-                    msg = "Waiting for %s analysis thread to finish" % self.p_bar_rca.text()
-                    logging.info(msg=msg)
+                        # Call the threads quit method again to ensure it to finish
+                        current_thread.quit()
 
-                    # Wait until every thread has finished
-                    start = time.time()
-                    while current_thread.isRunning():
-                        current_thread = self.tw[self.p_bar_rca.text()].analysis_thread#.isRunning()
-                    end = time.time()
+                        msg = "Waiting for %s analysis thread to finish" % self.p_bar_rca.text()
+                        logging.info(msg=msg)
 
-                    msg = "Waited %f seconds for %s analysis thread to finish" % (end - start, self.p_bar_rca.text())
-                    logging.info(msg=msg)
+                        # Wait until every thread has finished
+                        start = time.time()
+                        while current_thread.isRunning():
+                            current_thread = self.tw[self.p_bar_rca.text()].analysis_thread
+                        end = time.time()
 
-                if self.flag_interrupt:
+                        msg = "Waited %f seconds for %s analysis thread to finish" % (end - start, self.p_bar_rca.text())
+                        logging.info(msg=msg)
 
-                    # Disconnect and re-connect tabs
-                    for tab_name in self.tw.keys():
-                        self.tw[tab_name].proceedAnalysis.disconnect()
-                    self.connect_tabs()
+                    if self.flag_interrupt:
 
-                    # Remove consecutive analysis progressbar
-                    self.remove_widget(widget=self.widget_rca, layout=self.main_layout)
+                        # Disconnect and re-connect tabs
+                        for tab_name in self.tw.keys():
+                            self.tw[tab_name].proceedAnalysis.disconnect()
+                        self.connect_tabs()
 
-                else:
-                    if isinstance(tab_list, list):
-                        tab_name = tab_list[0]
+                        # Enable settings after/interrupted consecutive analysis
+                        self.settings_menu.actions()[0].setEnabled(True)
+                        self.settings_menu.setToolTipsVisible(False)
+
+                        # Remove consecutive analysis progressbar
+                        self.remove_widget(widget=self.widget_rca, layout=self.main_layout)
+
                     else:
-                        tab_name = tab_list
-
-                    if tab_name in self.tab_order:
-
                         # Update progressbar
                         self.p_bar_rca.setFormat(tab_name)
                         self.p_bar_rca.setValue(self.tab_order.index(tab_name))
 
-                    else:
-                        # Last tab finished
-                        self.p_bar_rca.setValue(len(self.tab_order))
-                        self.label_rca.setText('Done!')
-                        # Remove consecutive analysis progressbar
-                        self.remove_widget(widget=self.widget_rca, layout=self.main_layout)
+                else:
+                    # Last tab finished
+                    self.p_bar_rca.setValue(len(self.tab_order))
+                    self.label_rca.setText('Done!')
+                    # Remove consecutive analysis progressbar
+                    self.remove_widget(widget=self.widget_rca, layout=self.main_layout)
 
     def handle_exceptions(self, exception, trace_back, tab, cause):
         """

@@ -126,7 +126,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
 
         # Get plots
         if figures is None:
-            fig = self.plot_func(self.input_file, gui=True, **self.kwargs)
+            fig = self.plot_func(self.input_file, **self.kwargs)
         else:
             fig = figures
 
@@ -258,14 +258,14 @@ class AnalysisPlotter(QtWidgets.QWidget):
                     fig = self.figures[key]
                 else:
                     if key in self.kwargs.keys():
-                        fig = self.plot_func[key](self.input_file[key], gui=True, **self.kwargs[key])
+                        fig = self.plot_func[key](self.input_file[key], **self.kwargs[key])
                     else:
-                        fig = self.plot_func[key](self.input_file[key], gui=True)
+                        fig = self.plot_func[key](self.input_file[key])
             else:
                 if key in self.kwargs.keys():
-                    fig = self.plot_func[key](self.input_file[key], gui=True, **self.kwargs[key])
+                    fig = self.plot_func[key](self.input_file[key], **self.kwargs[key])
                 else:
-                    fig = self.plot_func[key](self.input_file[key], gui=True)
+                    fig = self.plot_func[key](self.input_file[key])
 
             self.plot(external_widget=dummy_widget, figures=fig)
 
