@@ -74,10 +74,6 @@ script:
   
 after_success:
   - coveralls --data_file .coverage.*
+  - scripts/create_doc.sh
 
-deploy:
-  provider: script
-  script: scripts/create_doc.sh
-  on:
-    branch: gui
   
