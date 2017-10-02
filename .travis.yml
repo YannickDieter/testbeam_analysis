@@ -79,6 +79,5 @@ deploy:
   provider: script
   script: scripts/create_doc.sh
   on:
-    - branch: gui
-    - os: linux
+    branch: gui
   
