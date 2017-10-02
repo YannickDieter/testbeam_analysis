@@ -32,7 +32,7 @@ notifications:
     
 cache:
   directories:
-  - $HOME/.pip-cache/
+    - $HOME/.pip-cache/
 
 # Setup miniconda python with needed packages
 before_install:
@@ -79,5 +79,6 @@ deploy:
   provider: script
   script: scripts/create_doc.sh
   on:
-    branch: development
+    - branch: gui
+    - os: linux
   

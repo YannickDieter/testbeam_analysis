@@ -9,3 +9,4 @@ if [ "$MINICONDA_OS" == "linux" ]; then
   export ${!TRAVIS*};
   sphinx-versioning push -r development -w master -w development -b docs gh-pages .;
 fi
+exit 0
