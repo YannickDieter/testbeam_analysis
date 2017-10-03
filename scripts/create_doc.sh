@@ -1,5 +1,6 @@
 #!/bin/bash
-if [ "$TRAVIS_BRANCH" == "gui" ] && [ "$MINICONDA_OS" == "linux" ] && [ "$TRAVIS_PYTHON_VERSION" == "2.7" ]; then
+set -e # Exit with nonzero exit code if anything fails
+if [ "$TRAVIS_BRANCH" == "gui" ] && [ "$TRAVIS_OS_NAME" == "linux" ] && [ "$TRAVIS_PYTHON_VERSION" == "2.7" ]; then
   echo 'Create docs!'
   sphinx-build docs docs/_build/html
   eval "$(ssh-agent -s)"; touch docs/key; chmod 0600 docs/key
@@ -12,7 +13,7 @@ if [ "$TRAVIS_BRANCH" == "gui" ] && [ "$MINICONDA_OS" == "linux" ] && [ "$TRAVIS
 else
   echo 'Did not create docs'
   echo $TRAVIS_BRANCH
-  echo $MINICONDA_OS
+  echo $TRAVIS_OS_NAME
   echo $TRAVIS_PYTHON_VERSION
 fi
 exit 0
