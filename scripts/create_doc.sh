@@ -11,5 +11,8 @@ if [ "$TRAVIS_BRANCH" == "gui" ] && [ "$MINICONDA_OS" == "linux" ] && [ "$TRAVIS
   sphinx-versioning push -r development -w master -w development -b docs gh-pages .
 else
   echo 'Did not create docs'
+  echo $TRAVIS_BRANCH
+  echo $MINICONDA_OS
+  echo $TRAVIS_PYTHON_VERSION
 fi
 exit 0
