@@ -1,7 +1,6 @@
 import sys
 import logging
 import platform
-import time
 
 from email import message_from_string
 from pkg_resources import get_distribution, DistributionNotFound
@@ -320,13 +319,14 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 else:
                     pass
 
-    def update_tabs(self, data=None, tabs=None, skip=None):
+    def update_tabs(self, data=None, tabs=None, skip=None, exception=False):
         """
         Updates the setup and options with data from the SetupTab and then updates the tabs
 
         :param tabs: list of strings with tab names that should be updated, if None update all
         :param data: dict with all information necessary to perform analysis, if None only update tabs
         :param skip: str or list of tab names which should be skipped when updating tabs
+        :param exception: bool determine whether to update a running analysis tab; if exception is thrown, update
         """
 
         # Save users current tab position
@@ -432,9 +432,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         for tab in self.tab_order:
             if tab in tmp_tw.keys():
 
-                # If analysis is running, don't update tab
+                # If analysis is running, don't update tab except exception causes update
                 try:
-                    if self.tw[tab].analysis_thread.isRunning():
+                    if self.tw[tab].analysis_thread.isRunning() and not exception:
                         continue
                 except AttributeError:
                     pass
@@ -607,46 +607,49 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.layout_rca.addWidget(self.btn_interrupt_rca)
 
         # Get starting tab
-        self.starting_tab_rca = self.current_analysis_tab()
+        self.starting_tab_rca = self.current_analysis_tab() if self.current_analysis_tab() != self.tab_order[-1] else self.tab_order[-2]
 
         for tab in self.tab_order:
 
             # Connect starting tab and all following
             if self.tab_order.index(tab) >= self.tab_order.index(self.starting_tab_rca):
 
-                # Handle consecutive analysis
-                self.tw[tab].proceedAnalysis.connect(lambda tab_list: handle_rca(tab_list))
+                # Disable the ok buttons since following tabs are enabled before respective analysis starts
+                # due to different trigger signals
+                self.tw[tab].btn_ok.setDisabled(True)
+
+                # No plotting for AlignmentTab so far, manually emit signal
+                if tab == 'Alignment':
+                    self.tw[tab].proceedAnalysis.connect(
+                        lambda: self.tw['Alignment'].plottingFinished.emit(self.tw['Alignment'].name))
 
                 # Check whether or not alignment is skipped
                 if tab == 'Track finding' and self.options['skip_alignment']:
-                    for x in [lambda tab_list: self.tw[tab_list[0]].skipAlignment.emit(),
-                              lambda tab_list: self.tw[tab_list[0]].proceedAnalysis.emit(self.tw[tab_list[0]].tl)]:
-                        self.tw[tab].proceedAnalysis.connect(x)
-
+                    for x in [lambda: self.tw['Alignment'].skipAlignment.emit(),
+                              lambda: self.tw['Alignment'].proceedAnalysis.emit(self.tw['Alignment'].tl)]:
+                        self.tw[tab].plottingFinished.connect(x)
                 else:
-                    if tab != self.tab_order[-1]:
-                        self.tw[tab].proceedAnalysis.connect(lambda tab_list: self.tw[tab_list[0]].btn_ok.clicked.emit())
+                    # Handle consecutive analysis
+                    self.tw[tab].plottingFinished.connect(lambda finished_tab: handle_rca(finished_tab))
 
         # Start analysis by clicking ok button on starting tab
         self.tw[self.starting_tab_rca].btn_ok.clicked.emit()
         self.p_bar_rca.setValue(self.tab_order.index(self.starting_tab_rca))
         self.p_bar_rca.setFormat(self.starting_tab_rca)
 
-        def handle_rca(tab_list=None, interrupt=False):
+        def handle_rca(tab=None, interrupt=False):
             """
             Helper function to run consecutive analysis
-            :param tab_list: list or str of tab name whichs analysis step is to be started
+            :param tab: str of tab name whose analysis was done
             :param interrupt: bool whether interrupt btn was clicked 
             """
 
             # Redundant call
-            if tab_list is None and not interrupt:
+            if tab is None and not interrupt:
                 return
 
-            if isinstance(tab_list, list):
-                tab_name = tab_list[0]
-            else:
-                tab_name = tab_list
+            # Get following analysis tabs name
+            tab_name = self.tab_order[self.tab_order.index(tab) + 1] if tab in self.tab_order[:-1] else 'Last'
 
             # If interrupt btn was clicked set flag
             if interrupt:
@@ -660,38 +663,23 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 self.p_bar_rca.setDisabled(True)
 
             else:
-
                 if tab_name in self.tab_order:
-
-                    # Get thread status of current analysis thread
-                    current_tab = self.tab_order[self.tab_order.index(tab_name) - 1]
-                    print current_tab, self.p_bar_rca.text()
-                    current_thread = self.tw[current_tab].analysis_thread
-
-                    # If running, quit and wait for it to finish before starting next tab
-                    if current_thread.isRunning():
-
-                        # Call the threads quit method again to ensure it to finish
-                        current_thread.quit()
-
-                        msg = "Waiting for %s analysis thread to finish" % self.p_bar_rca.text()
-                        logging.info(msg=msg)
-
-                        # Wait until every thread has finished
-                        start = time.time()
-                        while current_thread.isRunning():
-                            current_thread = self.tw[self.p_bar_rca.text()].analysis_thread
-                        end = time.time()
-
-                        msg = "Waited %f seconds for %s analysis thread to finish" % (end - start, self.p_bar_rca.text())
-                        logging.info(msg=msg)
 
                     if self.flag_interrupt:
 
-                        # Disconnect and re-connect tabs
-                        for tab_name in self.tw.keys():
-                            self.tw[tab_name].proceedAnalysis.disconnect()
-                        self.connect_tabs()
+                        # Disconnect and enable
+                        for tab_ in self.tw.keys():
+
+                            try:
+
+                                if self.tab_order.index(tab_) >= self.tab_order.index(self.current_analysis_tab()):
+                                    # Disconnect
+                                    self.tw[tab_].plottingFinished.disconnect()
+                                    # Enable OK button of following tabs
+                                    self.tw[tab_].btn_ok.setDisabled(False)
+
+                            except (AttributeError, RuntimeError):
+                                pass
 
                         # Enable settings after/interrupted consecutive analysis
                         self.settings_menu.actions()[0].setEnabled(True)
@@ -701,6 +689,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                         self.remove_widget(widget=self.widget_rca, layout=self.main_layout)
 
                     else:
+                        # Start new analysis
+                        self.tw[tab_name].btn_ok.clicked.emit()
+
                         # Update progressbar
                         self.p_bar_rca.setFormat(tab_name)
                         self.p_bar_rca.setValue(self.tab_order.index(tab_name))
@@ -748,7 +739,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             self.exception_window = ExceptionWindow(exception=exception, trace_back=trace_back,
                                                     tab=tab, cause=cause, parent=self)
             self.exception_window.show()
-            self.exception_window.exceptionRead.connect(lambda: self.update_tabs(tabs=tab))
+            self.exception_window.exceptionRead.connect(lambda: self.update_tabs(tabs=tab, exception=True))
 
             # Remove progressbar of consecutive analysis if there is one
             try:
