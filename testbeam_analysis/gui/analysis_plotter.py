@@ -7,6 +7,8 @@ import matplotlib
 import inspect
 import logging
 
+from testbeam_analysis.gui.analysis_worker import AnalysisWorker
+
 from PyQt5 import QtWidgets, QtCore
 
 matplotlib.use('Qt5Agg')  # Make sure that we are using QT5
@@ -18,8 +20,12 @@ class AnalysisPlotter(QtWidgets.QWidget):
     """
     Implements generic plotting area widget. Takes one or multiple plotting functions and their input files
     and displays figures from their return values. Supports single and multiple figures as return values.
-    Also supports plotting from multiple functions at once and input of predefined figures
+    Also supports plotting from multiple functions at once and input of predefined figures. If figures are plotted
+    from provided plotting functions, the functions are executed on an extra thread
     """
+
+    startedPlotting = QtCore.pyqtSignal()
+    finishedPlotting = QtCore.pyqtSignal()
 
     def __init__(self, input_file=None, plot_func=None, figures=None, parent=None, **kwargs):
 
@@ -41,6 +47,12 @@ class AnalysisPlotter(QtWidgets.QWidget):
 
         # Bool whether to plot from multiple functions at once
         multi_plot = False
+
+        # Threading related
+        self.plotting_thread = QtCore.QThread()
+        self.plotting_thread.started.connect(lambda: self.startedPlotting.emit())
+        self.plotting_thread.finished.connect(self.plotting_thread.deleteLater)
+        self.plotting_thread.finished.connect(lambda: self.finishedPlotting.emit())
 
         # Multiple plot_functions with respective input_data; dicts of plotting functions and input files
         # must have same keys. If figures are given, they must be given as a dict with a key that is in the
@@ -74,23 +86,113 @@ class AnalysisPlotter(QtWidgets.QWidget):
         # Whether to plot a single or multiple functions
         if not multi_plot:
 
+            # Init resulting figures and worker
+            self.result_figs = None
+            self.plotting_worker = None
+
             # Check whether kwargs are are args in plot_func
             if self.kwargs:
                 self.check_kwargs(self.plot_func, self.kwargs)
 
             if self.figures is None:
-                self.plot()
+
+                # Create respective worker instance
+                self._spawn_worker()
+
+                # Start plotting
+                self.plotting_thread.start()
+
             else:
+
+                # Figures are already there, just add to widget
                 self.plot(figures=self.figures)
         else:
 
-            if self.kwargs:
+            # Init resulting figures and workers as dict, init counter
+            self.result_figs = {}
+            self.plotting_worker = {}
+            self._finished_workers = 0
 
-                # Check whether kwargs are are args in plot_func
+            # Check whether kwargs are are args in plot_func
+            if self.kwargs:
                 for key in self.kwargs.keys():
                     self.check_kwargs(self.plot_func[key], self.kwargs[key])
 
             self.multi_plot()
+
+    def _spawn_worker(self, multi_plot_key=None, dummy_widget=None):
+        """
+        Method to create a worker for plotting and move it to self.plotting_thread. Workers are created
+        with regard to whether multiple or a single plot is created. 
+        
+        :param multi_plot_key: Whether worker is created for specific multi_plot_key in self.plot_func.keys() or single plot
+        :param dummy_widget: External widget to be plotted on for multi_plot
+        """
+
+        # Single plot
+        if multi_plot_key is None:
+            self.plotting_worker = AnalysisWorker(func=self._get_figs, args=multi_plot_key)
+            self.plotting_worker.moveToThread(self.plotting_thread)
+            self.plotting_thread.started.connect(self.plotting_worker.work)
+
+            if dummy_widget is None:
+                self.plotting_worker.finished.connect(lambda: self.plot(figures=self.result_figs))
+            else:
+                self.plotting_worker.finished.connect(lambda: self.plot(external_widget=dummy_widget,
+                                                                        figures=self.result_figs))
+            # Connect to slot for quitting thread and clean-up
+            self.plotting_worker.finished.connect(self._quit_thread)
+            self.plotting_worker.finished.connect(self.plotting_worker.deleteLater)
+
+        # Multiple plots
+        else:
+            self.plotting_worker[multi_plot_key] = AnalysisWorker(func=self._get_figs, args=multi_plot_key)
+            self.plotting_worker[multi_plot_key].moveToThread(self.plotting_thread)
+            self.plotting_thread.started.connect(self.plotting_worker[multi_plot_key].work)
+
+            if dummy_widget is None:
+                self.plotting_worker[multi_plot_key].finished.connect(
+                    lambda: self.plot(figures=self.result_figs[multi_plot_key]))
+            else:
+                self.plotting_worker[multi_plot_key].finished.connect(
+                    lambda: self.plot(external_widget=dummy_widget, figures=self.result_figs[multi_plot_key]))
+
+            # Connect to slot for quitting thread and clean-up
+            self.plotting_worker[multi_plot_key].finished.connect(self._quit_thread)
+            self.plotting_worker[multi_plot_key].finished.connect(self.plotting_worker[multi_plot_key].deleteLater)
+
+    def _quit_thread(self):
+        """
+        Quits self.plotting_thread with regard to multiple or single plot
+        """
+        if isinstance(self.input_file, dict):
+            self._finished_workers += 1
+            if self._finished_workers == len(self.input_file.keys()):
+                self.plotting_thread.quit()
+        else:
+            self.plotting_thread.quit()
+
+    def _get_figs(self, multi_plot_key):
+        """
+        Actual function that is run in the worker on self.plotting_thread. Saves the result figures in self.figures
+        
+        :param multi_plot_key: Whether to get figures for specific muli_plot_key in self.plot_func.keys() or single plot
+        """
+
+        # Single plot
+        if multi_plot_key is None:
+            self.result_figs = self.plot_func(self.input_file, **self.kwargs)
+
+        # Multiple plots
+        else:
+            if multi_plot_key not in self.result_figs.keys():
+                if multi_plot_key in self.kwargs.keys():
+                    self.result_figs[multi_plot_key] = self.plot_func[multi_plot_key](self.input_file[multi_plot_key],
+                                                                                      **self.kwargs[multi_plot_key])
+                else:
+                    self.result_figs[multi_plot_key] = self.plot_func[multi_plot_key](self.input_file[multi_plot_key])
+            else:
+                pass
 
     def check_kwargs(self, plot_func, kwargs):
         """
@@ -124,21 +226,15 @@ class AnalysisPlotter(QtWidgets.QWidget):
                         of self.plot_func. If figures are given, just plot them onto widget.
         """
 
-        # Get plots
         if figures is None:
-            fig = self.plot_func(self.input_file, **self.kwargs)
-        else:
-            fig = figures
-
-        if fig is None:
             logging.warning('No figures returned by %s. No plotting possible' % self.plot_func.__name__)
             return
 
         # Make list of figures if not already
-        if isinstance(fig, list):
-            fig_list = fig
+        if isinstance(figures, list):
+            fig_list = figures
         else:
-            fig_list = [fig]
+            fig_list = [figures]
 
         # Check for multiple plots and init plot widget
         if len(fig_list) > 1:
@@ -254,21 +350,22 @@ class AnalysisPlotter(QtWidgets.QWidget):
             dummy_widget.setLayout(QtWidgets.QVBoxLayout())
 
             if self.figures is not None and key in self.figures.keys():
-                if self.figures[key] is not None:
-                    fig = self.figures[key]
-                else:
-                    if key in self.kwargs.keys():
-                        fig = self.plot_func[key](self.input_file[key], **self.kwargs[key])
-                    else:
-                        fig = self.plot_func[key](self.input_file[key])
-            else:
-                if key in self.kwargs.keys():
-                    fig = self.plot_func[key](self.input_file[key], **self.kwargs[key])
-                else:
-                    fig = self.plot_func[key](self.input_file[key])
 
-            self.plot(external_widget=dummy_widget, figures=fig)
+                # If one of the multi_plot functions already has figures, add to result figures
+                if self.figures[key] is not None:
+                    self.result_figs[key] = self.figures[key]
+
+                # Create respective worker instance
+                self._spawn_worker(multi_plot_key=key, dummy_widget=dummy_widget)
+
+            else:
+
+                # Create respective worker instance
+                self._spawn_worker(multi_plot_key=key, dummy_widget=dummy_widget)
 
             tabs.addTab(dummy_widget, str(key).capitalize())
+
+        # Start plotting
+        self.plotting_thread.start()
 
         self.main_layout.addWidget(tabs)
