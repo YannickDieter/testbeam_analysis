@@ -16,7 +16,7 @@ class AnalysisWorker(QtCore.QObject):
 
     finished = QtCore.pyqtSignal()
     exceptionSignal = QtCore.pyqtSignal(Exception, str)
-    statusSignal = QtCore.pyqtSignal(int)
+    progressSignal = QtCore.pyqtSignal()
 
     def __init__(self, func, args=None, funcs_args=None):
         super(AnalysisWorker, self).__init__()
@@ -36,9 +36,6 @@ class AnalysisWorker(QtCore.QObject):
         occur, a signal sends the exception to main thread. Most recent traceback wil be dumped in yaml file.
         """
 
-        # Counter to emit status of analysis
-        index_status = 0
-
         try:
 
             # Do analysis functions
@@ -46,23 +43,11 @@ class AnalysisWorker(QtCore.QObject):
 
                 for func, kwargs in self.funcs_args:
 
-                    # If kwargs is list, do func for each element in kwargs; used for parallel analysis
-                    if isinstance(kwargs, list):
-
-                        for k in kwargs:
-                            self.main_func(func, k)
-
-                            # Increase index and emit signal
-                            index_status += 1
-                            self.statusSignal.emit(index_status)
-
                     # Each func has unique kwargs; used for analysis
-                    else:
-                        self.main_func(func, kwargs)
+                    self.main_func(func, kwargs)
 
-                        # Increase index and emit signal
-                        index_status += 1
-                        self.statusSignal.emit(index_status)
+                    # Emit progress signal
+                    self.progressSignal.emit()
 
             # Do some arbitrary function
             else:

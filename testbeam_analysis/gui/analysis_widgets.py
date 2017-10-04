@@ -16,8 +16,9 @@ from numpydoc.docscrape import FunctionDoc
 from PyQt5 import QtWidgets, QtCore, QtGui
 
 from testbeam_analysis.gui import option_widget
-from analysis_plotter import AnalysisPlotter
-from analysis_worker import AnalysisWorker
+from testbeam_analysis.gui.analysis_plotter import AnalysisPlotter
+from testbeam_analysis.gui.analysis_worker import AnalysisWorker
+from testbeam_analysis.gui.analysis_bar import AnalysisBar
 
 
 def get_default_args(func):
@@ -64,6 +65,8 @@ class AnalysisWidget(QtWidgets.QWidget):
     analysisDone = QtCore.pyqtSignal(list)
     # Signal emitted if exceptions occur
     exceptionSignal = QtCore.pyqtSignal(Exception, str, str, str)
+
+    plottingFinished = QtCore.pyqtSignal(str)
 
     def __init__(self, parent, setup, options, name, tab_list=None):
         super(AnalysisWidget, self).__init__(parent)
@@ -112,7 +115,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         # Proceed button and progressbar
         self.btn_ok = QtWidgets.QPushButton('Ok')
         self.btn_ok.clicked.connect(lambda: self._call_funcs())
-        self.p_bar = QtWidgets.QProgressBar()
+        self.p_bar = AnalysisBar()
         self.p_bar.setVisible(False)
 
         # Container widget to disable all but ok button after perfoming analysis
@@ -412,7 +415,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         # Disable ok button and show progressbar
         self.btn_ok.setDisabled(True)
         self.p_bar.setVisible(True)
-        self.p_bar.setRange(0, 0)
+        self.p_bar.setBusy('Running analysis...')
 
         # Go to bottom of scroll area and disable widgets
         self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
@@ -423,8 +426,8 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.analysis_worker.moveToThread(self.analysis_thread)
 
         # Connect worker's status
-        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setRange(0, len(self.calls.keys())))
-        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setValue(i))
+        self.analysis_worker.progressSignal.connect(lambda: self.p_bar.setRange(0, len(self.calls.keys())))
+        self.analysis_worker.progressSignal.connect(lambda: self.p_bar.setValue(self.p_bar.value() + 1))
 
         # Connect exceptions signal
         self.analysis_worker.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
@@ -434,9 +437,9 @@ class AnalysisWidget(QtWidgets.QWidget):
 
         # Connect workers work method to the start of the thread, quit thread when worker finishes and clean-up
         self.analysis_thread.started.connect(self.analysis_worker.work)
-        self.analysis_worker.finished.connect(self.emit_analysis_done)
         self.analysis_worker.finished.connect(self.analysis_thread.quit)
-        self.analysis_worker.finished.connect(self.analysis_worker.deleteLater)
+        self.analysis_thread.finished.connect(self.emit_analysis_done)
+        self.analysis_thread.finished.connect(self.analysis_worker.deleteLater)
         self.analysis_thread.finished.connect(self.analysis_thread.deleteLater)
 
         # Start thread
@@ -499,6 +502,9 @@ class AnalysisWidget(QtWidgets.QWidget):
         try:
             plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, figures=figures, parent=self.left_widget,
                                    **kwargs)
+            plot.startedPlotting.connect(lambda: self.p_bar.setBusy('Plotting'))
+            plot.finishedPlotting.connect(lambda: self.p_bar.setFinished())
+            plot.finishedPlotting.connect(lambda: self.plottingFinished.emit(self.name))
             self.plt.addWidget(plot)
         except Exception as e:
             self.emit_exception(exception=e, trace_back=traceback.format_exc(),
@@ -530,6 +536,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
     parallelAnalysisDone = QtCore.pyqtSignal(list)
     exceptionSignal = QtCore.pyqtSignal(Exception, str, str, str)
+    plottingFinished = QtCore.pyqtSignal(str)
 
     def __init__(self, parent, setup, options, name, tab_list=None):
 
@@ -543,7 +550,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.sub_layout = QtWidgets.QHBoxLayout()
         self.btn_ok = QtWidgets.QPushButton('Ok')
         self.btn_ok.clicked.connect(lambda: self._call_parallel_funcs())
-        self.p_bar = QtWidgets.QProgressBar()
+        self.p_bar = AnalysisBar()
         self.p_bar.setVisible(False)
 
         # Set alignment in sub-layout
@@ -566,7 +573,8 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
         # Initialize thread and worker
         self.analysis_thread = QtCore.QThread()  # no parent
-        self.analysis_worker = None
+        self.analysis_worker = {}
+        self._n_workers_finished = 0
 
         # Make dict to store all tabs calls.values() (dict) in a list with parallel function as key
         self.parallel_calls = defaultdict(list)
@@ -659,10 +667,6 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                                                            optional=optional, default_value=default_value[i],
                                                            fixed=fixed, tooltip=tooltip)
 
-    def _call_parallel_func(self, func, kwargs):
-        # TODO: check for correct and complete kwargs like in AnalysisWidget()._call_func. Works for now
-        func(**kwargs)
-
     def _call_parallel_funcs(self):
         """
         Calls the respective call_funcs method of each of the AnalysisWidgets and disables all input widgets 
@@ -671,41 +675,43 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         # Disable ok button and show progressbar
         self.btn_ok.setDisabled(True)
         self.p_bar.setVisible(True)
-        self.p_bar.setRange(0, 0)
+        self.p_bar.setBusy('Running analysis...')
 
-        for tab in self.tw.keys():
+        for tab in sorted(self.tw.keys()):
 
             # Disable widgets
             self.tw[tab].container.setDisabled(True)
 
-            # Fill parallel calls with function and all kwargs
-            for func, kwargs in self.tw[tab].calls.iteritems():
-                self.parallel_calls[func].append(kwargs)
+            # Create worker for each analysis function and move to thread
+            self.analysis_worker[tab] = AnalysisWorker(func=self.tw[tab]._call_func,
+                                                       funcs_args=self.tw[tab].calls.iteritems())
+            self.analysis_worker[tab].moveToThread(self.analysis_thread)
 
-        # Create worker for vitables and move to thread
-        self.analysis_worker = AnalysisWorker(func=self._call_parallel_func,  # FIXME: hackish self.tw[tab]._call_func
-                                              funcs_args=self.parallel_calls.iteritems())
-        self.analysis_worker.moveToThread(self.analysis_thread)
+            # Connect worker's status
+            self.analysis_worker[tab].progressSignal.connect(lambda: self.p_bar.setRange(0, len(self.tw.keys())))
+            self.analysis_worker[tab].progressSignal.connect(lambda: self.p_bar.setValue(self.p_bar.value() + 1))
 
-        # Connect worker's status
-        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setRange(0, len(self.tw.keys())))
-        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setValue(i))
+            # Connect exceptions signal
+            self.analysis_worker[tab].exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
+                                                                                                     trace_back=trc_bck,
+                                                                                                     name=self.name,
+                                                                                                     cause='analysis'))
 
-        # Connect exceptions signal
-        self.analysis_worker.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
-                                                                                            trace_back=trc_bck,
-                                                                                            name=self.name,
-                                                                                            cause='analysis'))
+            # Connect workers work method to the start of the thread, quit thread when worker finishes and clean-up
+            self.analysis_thread.started.connect(self.analysis_worker[tab].work)
+            self.analysis_thread.finished.connect(self.analysis_worker[tab].deleteLater)
+            self.analysis_worker[tab].finished.connect(self._quit_thread)
 
-        # Connect workers work method to the start of the thread, quit thread when worker finishes and clean-up
-        self.analysis_thread.started.connect(self.analysis_worker.work)
-        self.analysis_worker.finished.connect(self.emit_parallel_analysis_done)
-        self.analysis_worker.finished.connect(self.analysis_thread.quit)
-        self.analysis_worker.finished.connect(self.analysis_worker.deleteLater)
+        self.analysis_thread.finished.connect(self.emit_parallel_analysis_done)
         self.analysis_thread.finished.connect(self.analysis_thread.deleteLater)
 
         # Start thread
         self.analysis_thread.start()
+
+    def _quit_thread(self):
+        self._n_workers_finished += 1
+        if self._n_workers_finished == len(self.tw.keys()):
+            self.analysis_thread.quit()
 
     def emit_parallel_analysis_done(self):
 
@@ -773,14 +779,25 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             names = list(self.tw.keys())
             names.reverse()
 
+        self._n_plots_finished = 0
+        self.p_bar.setBusy('Plotting')
+
         for dut in names:
             try:
                 plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func,
                                        dut_name=dut, **kwargs)
+                plot.finishedPlotting.connect(self._plotting_finished)
+
                 self.tw[dut].plt.addWidget(plot)
             except Exception as e:
                 self.emit_exception(exception=e, trace_back=traceback.format_exc(),
                                     name=self.name, cause='plotting')
+
+    def _plotting_finished(self):
+        self._n_plots_finished += 1
+        if self._n_plots_finished == len(self.tw.keys()):
+            self.p_bar.setFinished()
+            self.plottingFinished.emit(self.name)
 
     def emit_exception(self, exception, trace_back, name, cause):
         """
