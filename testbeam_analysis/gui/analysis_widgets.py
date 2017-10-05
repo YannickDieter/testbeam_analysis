@@ -78,6 +78,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         # Multi-threading related inits
         self.analysis_thread = QtCore.QThread()  # no parent
         self.analysis_worker = None
+        self.plotting_thread = QtCore.QThread()
         self.vitables_thread = QtCore.QThread()  # no parent
         self.vitables_worker = None
         # Holds functions with kwargs
@@ -499,16 +500,20 @@ class AnalysisWidget(QtWidgets.QWidget):
         :param figures: None, matplotlib.Figure() or list of such figures or dict of both if plotting for multiple functions
         :param kwargs: keyword arguments or keyword from dicts keys with another dict as argument if plotting for multiple functions
         """
-        try:
-            plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, figures=figures, parent=self.left_widget,
-                                   **kwargs)
-            plot.startedPlotting.connect(lambda: self.p_bar.setBusy('Plotting'))
-            plot.finishedPlotting.connect(lambda: self.p_bar.setFinished())
-            plot.finishedPlotting.connect(lambda: self.plottingFinished.emit(self.name))
-            self.plt.addWidget(plot)
-        except Exception as e:
-            self.emit_exception(exception=e, trace_back=traceback.format_exc(),
-                                name=self.name, cause='plotting')
+        plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, figures=figures,
+                               parent=self.left_widget, thread=self.plotting_thread, **kwargs)
+        plot.startedPlotting.connect(lambda: self.p_bar.setBusy('Plotting'))
+        plot.finishedPlotting.connect(self._plotting_finished)
+        plot.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e, trace_back=trc_bck,
+                                                                            name=self.name, cause='plotting'))
+        # Start plotting
+        plot.plot()
+
+        self.plt.addWidget(plot)
+
+    def _plotting_finished(self):
+        self.plottingFinished.emit(self.name)
+        self.p_bar.setFinished()
 
     def emit_exception(self, exception, trace_back, name, cause):
         """
@@ -575,6 +580,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.analysis_thread = QtCore.QThread()  # no parent
         self.analysis_worker = {}
         self._n_workers_finished = 0
+        self.plotting_thread = QtCore.QThread()
 
         # Make dict to store all tabs calls.values() (dict) in a list with parallel function as key
         self.parallel_calls = defaultdict(list)
@@ -783,15 +789,18 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.p_bar.setBusy('Plotting')
 
         for dut in names:
-            try:
-                plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func,
-                                       dut_name=dut, **kwargs)
-                plot.finishedPlotting.connect(self._plotting_finished)
+            plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func,
+                                   thread=self.plotting_thread, dut_name=dut, **kwargs)
+            plot.finishedPlotting.connect(self._plotting_finished)
+            plot.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e, trace_back=trc_bck,
+                                                                                name=self.name, cause='plotting'))
+            if not self.plotting_thread:
+                plot.plot()
 
-                self.tw[dut].plt.addWidget(plot)
-            except Exception as e:
-                self.emit_exception(exception=e, trace_back=traceback.format_exc(),
-                                    name=self.name, cause='plotting')
+            self.tw[dut].plt.addWidget(plot)
+
+        if self.plotting_thread:
+            self.plotting_thread.start()
 
     def _plotting_finished(self):
         self._n_plots_finished += 1

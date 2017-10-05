@@ -26,8 +26,9 @@ class AnalysisPlotter(QtWidgets.QWidget):
 
     startedPlotting = QtCore.pyqtSignal()
     finishedPlotting = QtCore.pyqtSignal()
+    exceptionSignal = QtCore.pyqtSignal(Exception, str)
 
-    def __init__(self, input_file=None, plot_func=None, figures=None, parent=None, **kwargs):
+    def __init__(self, input_file=None, plot_func=None, figures=None, thread=None, parent=None, **kwargs):
 
         super(AnalysisPlotter, self).__init__(parent)
 
@@ -41,6 +42,10 @@ class AnalysisPlotter(QtWidgets.QWidget):
         self.figures = figures
         self.kwargs = kwargs
 
+        # External thread provided for plotting; must be QtCore.QThread() or None, if None, no threading.
+        # After finishing, thread is deleted
+        self.plotting_thread = thread
+
         if input_file is None and plot_func is None and figures is None:
             msg = 'Need input file and plotting function or figures to do plotting!'
             raise ValueError(msg)
@@ -49,10 +54,10 @@ class AnalysisPlotter(QtWidgets.QWidget):
         multi_plot = False
 
         # Threading related
-        self.plotting_thread = QtCore.QThread()
-        self.plotting_thread.started.connect(lambda: self.startedPlotting.emit())
-        self.plotting_thread.finished.connect(self.plotting_thread.deleteLater)
-        self.plotting_thread.finished.connect(lambda: self.finishedPlotting.emit())
+        if self.plotting_thread:
+            self.plotting_thread.started.connect(lambda: self.startedPlotting.emit())
+            self.plotting_thread.finished.connect(lambda: self.finishedPlotting.emit())
+            self.plotting_thread.finished.connect(self.plotting_thread.deleteLater)
 
         # Multiple plot_functions with respective input_data; dicts of plotting functions and input files
         # must have same keys. If figures are given, they must be given as a dict with a key that is in the
@@ -94,18 +99,13 @@ class AnalysisPlotter(QtWidgets.QWidget):
             if self.kwargs:
                 self.check_kwargs(self.plot_func, self.kwargs)
 
-            if self.figures is None:
-
-                # Create respective worker instance
-                self._spawn_worker()
-
-                # Start plotting
-                self.plotting_thread.start()
-
-            else:
-
+            if self.figures:
                 # Figures are already there, just add to widget
-                self.plot(figures=self.figures)
+                self.result_figs = self.figures
+
+            # Create respective worker instance
+            self._spawn_worker()
+
         else:
 
             # Init resulting figures and workers as dict, init counter
@@ -118,7 +118,16 @@ class AnalysisPlotter(QtWidgets.QWidget):
                 for key in self.kwargs.keys():
                     self.check_kwargs(self.plot_func[key], self.kwargs[key])
 
-            self.multi_plot()
+            self._add_multi_plots()
+
+    def plot(self):
+        """
+        Starts plotting by starting self.plotting_thread or emitting self.startedPlotting signal
+        """
+        if self.plotting_thread:
+            self.plotting_thread.start()
+        else:
+            self.startedPlotting.emit()
 
     def _spawn_worker(self, multi_plot_key=None, dummy_widget=None):
         """
@@ -132,45 +141,69 @@ class AnalysisPlotter(QtWidgets.QWidget):
         # Single plot
         if multi_plot_key is None:
             self.plotting_worker = AnalysisWorker(func=self._get_figs, args=multi_plot_key)
-            self.plotting_worker.moveToThread(self.plotting_thread)
-            self.plotting_thread.started.connect(self.plotting_worker.work)
+
+            if self.plotting_thread:
+                self.plotting_worker.moveToThread(self.plotting_thread)
+                self.plotting_thread.started.connect(self.plotting_worker.work)
+            else:
+                self.startedPlotting.connect(self.plotting_worker.work)
 
             if dummy_widget is None:
-                self.plotting_worker.finished.connect(lambda: self.plot(figures=self.result_figs))
+                self.plotting_worker.finished.connect(lambda: self._add_plots(figures=self.result_figs))
             else:
-                self.plotting_worker.finished.connect(lambda: self.plot(external_widget=dummy_widget,
-                                                                        figures=self.result_figs))
+                self.plotting_worker.finished.connect(lambda: self._add_plots(figures=self.result_figs,
+                                                                              external_widget=dummy_widget))
+
+            # Connect exceptions signal
+            self.plotting_worker.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
+                                                                                                trace_back=trc_bck))
+
             # Connect to slot for quitting thread and clean-up
-            self.plotting_worker.finished.connect(self._quit_thread)
+            self.plotting_worker.finished.connect(self._finish_plotting)
             self.plotting_worker.finished.connect(self.plotting_worker.deleteLater)
 
         # Multiple plots
         else:
             self.plotting_worker[multi_plot_key] = AnalysisWorker(func=self._get_figs, args=multi_plot_key)
-            self.plotting_worker[multi_plot_key].moveToThread(self.plotting_thread)
-            self.plotting_thread.started.connect(self.plotting_worker[multi_plot_key].work)
+
+            if self.plotting_thread:
+                self.plotting_worker[multi_plot_key].moveToThread(self.plotting_thread)
+                self.plotting_thread.started.connect(self.plotting_worker[multi_plot_key].work)
+            else:
+                self.startedPlotting.connect(self.plotting_worker[multi_plot_key].work)
 
             if dummy_widget is None:
                 self.plotting_worker[multi_plot_key].finished.connect(
-                    lambda: self.plot(figures=self.result_figs[multi_plot_key]))
+                    lambda: self._add_plots(figures=self.result_figs[multi_plot_key]))
             else:
                 self.plotting_worker[multi_plot_key].finished.connect(
-                    lambda: self.plot(external_widget=dummy_widget, figures=self.result_figs[multi_plot_key]))
+                    lambda: self._add_plots(figures=self.result_figs[multi_plot_key], external_widget=dummy_widget))
+
+            # Connect exceptions signal
+            self.plotting_worker[multi_plot_key].exceptionSignal.connect(
+                lambda e, trc_bck: self.emit_exception(exception=e, trace_back=trc_bck))
 
             # Connect to slot for quitting thread and clean-up
-            self.plotting_worker[multi_plot_key].finished.connect(self._quit_thread)
+            self.plotting_worker[multi_plot_key].finished.connect(self._finish_plotting)
             self.plotting_worker[multi_plot_key].finished.connect(self.plotting_worker[multi_plot_key].deleteLater)
 
-    def _quit_thread(self):
+    def _finish_plotting(self):
         """
-        Quits self.plotting_thread with regard to multiple or single plot
+        Quits self.plotting_thread with regard to multiple or single plot if plotting thread is provided.
+        Otherwise emits finished signal
         """
         if isinstance(self.input_file, dict):
             self._finished_workers += 1
             if self._finished_workers == len(self.input_file.keys()):
-                self.plotting_thread.quit()
+                if self.plotting_thread:
+                    self.plotting_thread.quit()
+                else:
+                    self.finishedPlotting.emit()
         else:
-            self.plotting_thread.quit()
+            if self.plotting_thread:
+                self.plotting_thread.quit()
+            else:
+                self.finishedPlotting.emit()
 
     def _get_figs(self, multi_plot_key):
         """
@@ -181,7 +214,10 @@ class AnalysisPlotter(QtWidgets.QWidget):
 
         # Single plot
         if multi_plot_key is None:
-            self.result_figs = self.plot_func(self.input_file, **self.kwargs)
+            if not self.result_figs:
+                self.result_figs = self.plot_func(self.input_file, **self.kwargs)
+            else:
+                pass
 
         # Multiple plots
         else:
@@ -213,7 +249,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
             else:
                 pass
 
-    def plot(self, external_widget=None, figures=None):
+    def _add_plots(self, figures, external_widget=None):
         """
         Function for plotting one or multiple plots from a single plot_func.
         If the function returns multiple plots, respective widgets for navigation
@@ -222,8 +258,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
         :param external_widget: None or QWidget; if None figs are plotted on self (single fig) or an internal
                                 plot_widget. If QWidget figs are plotted on this widget (must have layout)
 
-        :param figures: matplotlib.Figure() or list of such figures; if None, figures are return values
-                        of self.plot_func. If figures are given, just plot them onto widget.
+        :param figures: matplotlib.Figure() or list of such figures; adds figures to plot widget
         """
 
         if figures is None:
@@ -328,10 +363,10 @@ class AnalysisPlotter(QtWidgets.QWidget):
                 else:
                     pass
 
-    def multi_plot(self):
+    def _add_multi_plots(self):
         """
         Function that allows plotting from multiple plot functions at once.
-        Creates a tab widget and one tab for every plot function. Uses self.plot() to plot
+        Creates a tab widget and one tab for every plot function. Uses self._add_plots() to add plots
         """
 
         if self.figures is not None:
@@ -365,7 +400,14 @@ class AnalysisPlotter(QtWidgets.QWidget):
 
             tabs.addTab(dummy_widget, str(key).capitalize())
 
-        # Start plotting
-        self.plotting_thread.start()
-
         self.main_layout.addWidget(tabs)
+
+    def emit_exception(self, exception, trace_back):
+        """
+        Emits exception signal
+
+        :param exception: Any Exception
+        :param trace_back: traceback of the exception or error
+        """
+
+        self.exceptionSignal.emit(exception, trace_back)
