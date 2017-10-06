@@ -33,7 +33,8 @@ class SettingsWindow(QtWidgets.QMainWindow):
                                 'plot': False,
                                 'noisy_suffix': '_noisy.h5',  # fixed since fixed in function
                                 'cluster_suffix': '_clustered.h5',  # fixed since fixed in function
-                                'skip_alignment': False}
+                                'skip_alignment': False,
+                                'skip_noisy_pixel': False}
 
         # Make copy of defaults to change values but don't change defaults
         if setup is None:

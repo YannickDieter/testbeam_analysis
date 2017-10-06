@@ -592,6 +592,9 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.vitables_thread = QtCore.QThread()  # no parent
         self.vitables_worker = None
 
+        # List in which DUTs are stored, COPY important
+        self.duts = setup['dut_names'][:]
+
         # List of tabs which will be enabled after analysis
         if isinstance(tab_list, list):
             self.tab_list = tab_list
@@ -683,30 +686,30 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.p_bar.setVisible(True)
         self.p_bar.setBusy('Running analysis...')
 
-        for tab in sorted(self.tw.keys()):
+        for dut in self.duts:
 
             # Disable widgets
-            self.tw[tab].container.setDisabled(True)
+            self.tw[dut].container.setDisabled(True)
 
             # Create worker for each analysis function and move to thread
-            self.analysis_worker[tab] = AnalysisWorker(func=self.tw[tab]._call_func,
-                                                       funcs_args=self.tw[tab].calls.iteritems())
-            self.analysis_worker[tab].moveToThread(self.analysis_thread)
+            self.analysis_worker[dut] = AnalysisWorker(func=self.tw[dut]._call_func,
+                                                       funcs_args=self.tw[dut].calls.iteritems())
+            self.analysis_worker[dut].moveToThread(self.analysis_thread)
 
             # Connect worker's status
-            self.analysis_worker[tab].progressSignal.connect(lambda: self.p_bar.setRange(0, len(self.tw.keys())))
-            self.analysis_worker[tab].progressSignal.connect(lambda: self.p_bar.setValue(self.p_bar.value() + 1))
+            self.analysis_worker[dut].progressSignal.connect(lambda: self.p_bar.setRange(0, len(self.duts)))
+            self.analysis_worker[dut].progressSignal.connect(lambda: self.p_bar.setValue(self.p_bar.value() + 1))
 
             # Connect exceptions signal
-            self.analysis_worker[tab].exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
+            self.analysis_worker[dut].exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
                                                                                                      trace_back=trc_bck,
                                                                                                      name=self.name,
                                                                                                      cause='analysis'))
 
             # Connect workers work method to the start of the thread, quit thread when worker finishes and clean-up
-            self.analysis_thread.started.connect(self.analysis_worker[tab].work)
-            self.analysis_thread.finished.connect(self.analysis_worker[tab].deleteLater)
-            self.analysis_worker[tab].finished.connect(self._quit_thread)
+            self.analysis_thread.started.connect(self.analysis_worker[dut].work)
+            self.analysis_thread.finished.connect(self.analysis_worker[dut].deleteLater)
+            self.analysis_worker[dut].finished.connect(self._quit_thread)
 
         self.analysis_thread.finished.connect(self.emit_parallel_analysis_done)
         self.analysis_thread.finished.connect(self.analysis_thread.deleteLater)
@@ -716,7 +719,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
     def _quit_thread(self):
         self._n_workers_finished += 1
-        if self._n_workers_finished == len(self.tw.keys()):
+        if self._n_workers_finished == len(self.duts):
             self.analysis_thread.quit()
 
     def emit_parallel_analysis_done(self):
@@ -782,8 +785,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         if dut_names:
             names = dut_names
         else:
-            names = list(self.tw.keys())
-            names.reverse()
+            names = self.duts
 
         self._n_plots_finished = 0
         self.p_bar.setBusy('Plotting')
@@ -804,7 +806,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
     def _plotting_finished(self):
         self._n_plots_finished += 1
-        if self._n_plots_finished == len(self.tw.keys()):
+        if self._n_plots_finished == len(self.duts):
             self.p_bar.setFinished()
             self.plottingFinished.emit(self.name)
 

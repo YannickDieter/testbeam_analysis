@@ -301,6 +301,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                         self.tw[name].proceedAnalysis.connect(xx)
                     self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
 
+                if name == 'Noisy Pixel':
+                    self.tw[name].proceedAnalysis.connect(lambda: self.update_tabs(tabs='Clustering'))
+
                 if name == 'Alignment':
                     for xxx in [lambda: self.update_tabs(data={'skip_alignment': True},
                                                          tabs=['Track fitting', 'Residuals', 'Efficiency'])]:
@@ -576,66 +579,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         Method to start a consecutive call of all analysis functions with their default values
         as defined in tab_widget.py. Acronym rca==run constructive analysis
         """
-        if self.tw[self.current_analysis_tab()].analysis_thread.isRunning():
-            msg = 'Can not start consecutive analysis while %s analysis is running.' % self.current_analysis_tab()
-            logging.warning(msg=msg)
-            return
-
-        # Disable settings during consecutive analysis
-        self.settings_menu.actions()[0].setEnabled(False)
-        self.settings_menu.setToolTipsVisible(True)
-        self.settings_menu.actions()[0].setToolTip('Settings cannot be changed during consecutive analysis')
-
-        # Whenever starting rca restore flag state
-        self.flag_interrupt = False
-
-        # Make sub-layout for consecutive analysis progressbar with label
-        self.widget_rca = QtWidgets.QWidget()
-        self.layout_rca = QtWidgets.QHBoxLayout()
-        self.widget_rca.setLayout(self.layout_rca)
-        self.main_layout.addWidget(self.widget_rca)
-
-        # Make widgets to fill rca layout
-        self.label_rca = QtWidgets.QLabel('Running consecutive analysis...')
-        self.p_bar_rca = QtWidgets.QProgressBar()
-        self.p_bar_rca.setRange(0, len(self.tab_order))
-        self.btn_interrupt_rca = QtWidgets.QPushButton('Interrupt')
-        self.btn_interrupt_rca.setToolTip('Interrupt consecutive analysis after finishing current analysis tab')
-        self.btn_interrupt_rca.clicked.connect(lambda: handle_rca(interrupt=True))
-        self.layout_rca.addWidget(self.label_rca)
-        self.layout_rca.addWidget(self.p_bar_rca)
-        self.layout_rca.addWidget(self.btn_interrupt_rca)
-
-        # Get starting tab
-        self.starting_tab_rca = self.current_analysis_tab() if self.current_analysis_tab() != self.tab_order[-1] else self.tab_order[-2]
-
-        for tab in self.tab_order:
-
-            # Connect starting tab and all following
-            if self.tab_order.index(tab) >= self.tab_order.index(self.starting_tab_rca):
-
-                # Disable the ok buttons since following tabs are enabled before respective analysis starts
-                # due to different trigger signals
-                self.tw[tab].btn_ok.setDisabled(True)
-
-                # No plotting for AlignmentTab so far, manually emit signal
-                if tab == 'Alignment':
-                    self.tw[tab].proceedAnalysis.connect(
-                        lambda: self.tw['Alignment'].plottingFinished.emit(self.tw['Alignment'].name))
-
-                # Check whether or not alignment is skipped
-                if tab == 'Track finding' and self.options['skip_alignment']:
-                    for x in [lambda: self.tw['Alignment'].skipAlignment.emit(),
-                              lambda: self.tw['Alignment'].proceedAnalysis.emit(self.tw['Alignment'].tl)]:
-                        self.tw[tab].plottingFinished.connect(x)
-                else:
-                    # Handle consecutive analysis
-                    self.tw[tab].plottingFinished.connect(lambda finished_tab: handle_rca(finished_tab))
-
-        # Start analysis by clicking ok button on starting tab
-        self.tw[self.starting_tab_rca].btn_ok.clicked.emit()
-        self.p_bar_rca.setValue(self.tab_order.index(self.starting_tab_rca))
-        self.p_bar_rca.setFormat(self.starting_tab_rca)
 
         def handle_rca(tab=None, interrupt=False):
             """
@@ -702,6 +645,86 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                     self.label_rca.setText('Done!')
                     # Remove consecutive analysis progressbar
                     self.remove_widget(widget=self.widget_rca, layout=self.main_layout)
+
+        if self.tw[self.current_analysis_tab()].analysis_thread.isRunning():
+            msg = 'Can not start consecutive analysis while %s analysis is running.' % self.current_analysis_tab()
+            logging.warning(msg=msg)
+            return
+
+        # Disable settings during consecutive analysis
+        self.settings_menu.actions()[0].setEnabled(False)
+        self.settings_menu.setToolTipsVisible(True)
+        self.settings_menu.actions()[0].setToolTip('Settings cannot be changed during consecutive analysis')
+
+        # Whenever starting rca restore flag state
+        self.flag_interrupt = False
+
+        # Make sub-layout for consecutive analysis progressbar with label
+        self.widget_rca = QtWidgets.QWidget()
+        self.layout_rca = QtWidgets.QHBoxLayout()
+        self.widget_rca.setLayout(self.layout_rca)
+        self.main_layout.addWidget(self.widget_rca)
+
+        # Make widgets to fill rca layout
+        self.label_rca = QtWidgets.QLabel('Running consecutive analysis...')
+        self.p_bar_rca = QtWidgets.QProgressBar()
+        self.p_bar_rca.setRange(0, len(self.tab_order))
+        self.btn_interrupt_rca = QtWidgets.QPushButton('Interrupt')
+        self.btn_interrupt_rca.setToolTip('Interrupt consecutive analysis after finishing current analysis tab')
+        self.btn_interrupt_rca.clicked.connect(lambda: handle_rca(interrupt=True))
+        self.layout_rca.addWidget(self.label_rca)
+        self.layout_rca.addWidget(self.p_bar_rca)
+        self.layout_rca.addWidget(self.btn_interrupt_rca)
+
+        # Get starting tab
+        self.starting_tab_rca = self.current_analysis_tab() if self.current_analysis_tab() != self.tab_order[-1] else self.tab_order[-2]
+
+        for tab in self.tab_order:
+
+            # Connect starting tab and all following
+            if self.tab_order.index(tab) >= self.tab_order.index(self.starting_tab_rca):
+
+                # Disable the ok buttons since following tabs are enabled before respective analysis starts
+                # due to different trigger signals
+                try:
+                    self.tw[tab].btn_ok.setDisabled(True)
+                # Alignment has been skipped in settings
+                except RuntimeError:
+                    pass
+
+                # No plotting for AlignmentTab so far, manually emit signal
+                if tab == 'Alignment':
+                    self.tw[tab].proceedAnalysis.connect(
+                        lambda: self.tw['Alignment'].plottingFinished.emit(self.tw['Alignment'].name))
+
+                    # Alignment updates the tabs below if skipped, need to reconnect
+                    for x in [lambda: self.tw['Track fitting'].plottingFinished.connect(lambda f: handle_rca(f)),
+                              lambda: self.tw['Residuals'].plottingFinished.connect(lambda f: handle_rca(f)),
+                              lambda: self.tw['Efficiency'].plottingFinished.connect(lambda f: handle_rca(f)),
+                              lambda: self.tw['Track fitting'].btn_ok.setDisabled(True),
+                              lambda: self.tw['Residuals'].btn_ok.setDisabled(True),
+                              lambda: self.tw['Efficiency'].btn_ok.setDisabled(True)]:
+                        self.tw[tab].skipAlignment.connect(x)
+
+                # Noisy Pixel analysis updates Clustering tab which thus needs to be reconnected to consecutive analysis
+                if tab == 'Noisy Pixel':
+                    self.tw[tab].proceedAnalysis.connect(
+                        lambda: self.tw['Clustering'].plottingFinished.connect(lambda finished_tab: handle_rca(finished_tab)))
+
+                # Check whether or not alignment is skipped
+                if tab == 'Track finding' and self.options['skip_alignment']:
+                    for x in [lambda: self.tw['Alignment'].skipAlignment.emit(),
+                              lambda: self.tw['Alignment'].proceedAnalysis.emit(self.tw['Alignment'].tl)]:
+                        self.tw[tab].plottingFinished.connect(x)
+
+                else:
+                    # Handle consecutive analysis
+                    self.tw[tab].plottingFinished.connect(lambda finished_tab: handle_rca(finished_tab))
+
+        # Start analysis by clicking ok button on starting tab
+        self.tw[self.starting_tab_rca].btn_ok.clicked.emit()
+        self.p_bar_rca.setValue(self.tab_order.index(self.starting_tab_rca))
+        self.p_bar_rca.setFormat(self.starting_tab_rca)
 
     def handle_exceptions(self, exception, trace_back, tab, cause):
         """

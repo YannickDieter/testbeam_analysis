@@ -32,14 +32,11 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
 
         # Make variables for input of noisy pixel function
         self.output_files = [os.path.join(options['output_path'], dut + options['noisy_suffix']) for dut in setup['dut_names']]
-        self.input_files = options['input_files']
-        self.n_pixels = setup['n_pixels']
-        self.duts = setup['dut_names']
 
         self.add_parallel_function(func=generate_pixel_mask)
 
         self.add_parallel_option(option='input_hits_file',
-                                 default_value=self.input_files,
+                                 default_value=options['input_files'],
                                  func=generate_pixel_mask,
                                  fixed=True)
         self.add_parallel_option(option='output_mask_file',
@@ -47,76 +44,69 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
                                  func=generate_pixel_mask,
                                  fixed=True)
         self.add_parallel_option(option='n_pixel',
-                                 default_value=self.n_pixels,
+                                 default_value=setup['n_pixels'],
                                  func=generate_pixel_mask,
                                  fixed=True)
         self.add_parallel_option(option='dut_name',
-                                 default_value=self.duts,
+                                 default_value=setup['dut_names'],
                                  func=generate_pixel_mask,
                                  fixed=False)
 
+        for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
+                  lambda: self._connect_vitables(files=self.output_files),
+                  lambda: self.plot(input_files=self.output_files,
+                                    plot_func=plot_masked_pixels,
+                                    dut_names=self.duts,
+                                    gui=True)]:
+            self.parallelAnalysisDone.connect(x)
+
         # Add checkbox to each tab to enable skipping noisy pixel removal individually
         self.check_boxes = {}
-        for dut in self.tw.keys():
+        for dut in setup['dut_names']:
             cb = QtWidgets.QCheckBox('Skip noisy pixel removal for %s' % dut)
+            cb.stateChanged.connect(self.check_skip)
             self.check_boxes[dut] = cb
             self.tw[dut].layout_options.addWidget(self.check_boxes[dut])
 
-        # Disconnect ok button and reconnect
         self.btn_ok.disconnect()
-        self.btn_ok.clicked.connect(lambda: self.check_skip_noisy())
+        self.btn_ok.clicked.connect(self.proceed)
+        self.check_skip()
 
-    def check_skip_noisy(self):
+    def proceed(self):
         """
-        Checks whether or not the noisy pixel masking is skipped for specific DUTs. Changes the respective
-        input parameters for the analysis widget.
+        Called when ok button is clicked. Either does analysis or skips if all noisy pixel cbs are checked 
         """
+        for key in self.tw.keys():
+            self.tw[key].container.setDisabled(True)
 
-        # Clear noisy pixel input variables
-        self.input_files = []
-        self.output_files = []
-        self.n_pixels = []
-        self.duts = []
-
-        # Loop over tabs and check the state of checkbox
-        for dut in self.setup['dut_names']:
-
-            # Mask noisy pixels for files with un-checked boxes
-            if not self.check_boxes[dut].isChecked():
-
-                self.input_files.append(self.options['input_files'][self.setup['dut_names'].index(dut)])
-                self.output_files.append(os.path.join(self.options['output_path'], dut + self.options['noisy_suffix']))
-                self.duts.append(dut)
-                self.n_pixels.append(self.setup['n_pixels'][self.setup['dut_names'].index(dut)])
-
-            # Do nothing
-            else:
-                pass
-
-        # Do plotting and connect vitables if masking is done for at least one DUT
-        if self.input_files:
-
-            for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
-                      lambda: self._connect_vitables(files=self.output_files),
-                      lambda: self.plot(input_files=self.output_files,
-                                        plot_func=plot_masked_pixels,
-                                        dut_names=self.duts,
-                                        gui=True)]:
-                self.parallelAnalysisDone.connect(x)
-
-            # Start masking
+        if self.duts:
             self._call_parallel_funcs()
-
-        # If all DUTs are skipped, disable container and enable next tab
         else:
-
-            for key in self.tw.keys():
-                self.tw[key].container.setDisabled(True)
-
             self.btn_ok.setDisabled(True)
+            self.proceedAnalysis.emit(self.tab_list)
+            self.plottingFinished.emit(self.name)
 
-            self.parallelAnalysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
-            self.parallelAnalysisDone.emit(self.tab_list)
+    def check_skip(self):
+        """
+        Checks whether noisy pixel analysis is skipped for certain DUTs, adjusts respective data and starts analysis 
+        """
+
+        # Make array with bools whether noisy pixel removal is skipped
+        self.options['skip_noisy_pixel'] = [False]*self.setup['n_duts']
+
+        # Loop over duts
+        for dut in self.setup['dut_names']:
+            if self.check_boxes[dut].isChecked():
+                self.duts = filter(lambda a: a != dut, self.duts)
+                self.output_files = filter(lambda a: dut not in a, self.output_files)
+                self.options['skip_noisy_pixel'][self.setup['dut_names'].index(dut)] = True
+            else:
+                if dut not in self.duts:
+                    self.duts.insert(self.setup['dut_names'].index(dut), dut)
+                    self.output_files.insert(self.setup['dut_names'].index(dut),
+                                             os.path.join(self.options['output_path'],
+                                                          dut + self.options['noisy_suffix']))
+                self.options['skip_noisy_pixel'][self.setup['dut_names'].index(dut)] = False
 
 
 class ClusterPixelsTab(ParallelAnalysisWidget):
@@ -136,11 +126,6 @@ class ClusterPixelsTab(ParallelAnalysisWidget):
                                  func=cluster_hits,
                                  fixed=True)
 
-        self.add_parallel_option(option='input_noisy_pixel_mask_file',
-                                 default_value=[os.path.join(options['output_path'], dut + options['noisy_suffix']) for dut in setup['dut_names']],
-                                 func=cluster_hits,
-                                 fixed=True)
-
         self.add_parallel_option(option='output_cluster_file',
                                  default_value=output_files,
                                  func=cluster_hits,
@@ -150,6 +135,16 @@ class ClusterPixelsTab(ParallelAnalysisWidget):
                                  default_value=setup['dut_names'],
                                  func=cluster_hits,
                                  fixed=False)
+
+        if options['skip_noisy_pixel']:
+            for dut in setup['dut_names']:
+                if not options['skip_noisy_pixel'][setup['dut_names'].index(dut)]:
+                    self.tw[dut].add_option(option='input_noisy_pixel_mask_file',
+                                            default_value=os.path.join(options['output_path'], dut + options['noisy_suffix']),
+                                            func=cluster_hits,
+                                            fixed=True)
+                else:
+                    pass
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_files),
