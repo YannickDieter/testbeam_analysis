@@ -1,16 +1,22 @@
 # -*- mode: python -*-
+import sys
+import os
+import testbeam_analysis
+
+mod_path = os.path.dirname(testbeam_analysis.__file__)
+gui_path = os.path.join(mod_path, 'gui/main.py')
 
 block_cipher = None
 
-
-a = Analysis(['main.py'],
+a = Analysis([gui_path],
              pathex=['/home/davidlp/git/testbeam_analysis/testbeam_analysis/gui'],
-             binaries=[],
-             datas=[ ('dut_types.yaml', '.') ],
+             # for libmkl
+             binaries=[(os.path.join(sys.prefix, 'lib/libiomp5.so'), '.')],
+             datas=[ (os.path.join(mod_path, 'gui/dut_types.yaml'), '.') ],
              hiddenimports=['setuptools.msvc',
                             'pixel_clusterizer.cluster_functions',
                             'numpydoc',
-                            'progressbar-latest'],
+                            'progressbar'],
              hookspath=[],
              runtime_hooks=[],
              excludes=[],
@@ -22,16 +28,18 @@ pyz = PYZ(a.pure, a.zipped_data,
 exe = EXE(pyz,
           a.scripts,
           exclude_binaries=True,
-          name='main',
+          name='tba',
           debug=False,
           strip=False,
           upx=False,
           console=True,
-          resources=['analysis_functions.so,dll,analysis_functions.so'])
+          # Missing runtime c includes that pyinstaller cannot see
+          # cythonized analysis part
+          resources=['analysis_functions.so,dll,analysis_functions.so']) 
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,
                a.datas,
                strip=False,
                upx=False,
-               name='main')
+               name='tba')
