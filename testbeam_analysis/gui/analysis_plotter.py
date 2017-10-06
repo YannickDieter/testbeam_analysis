@@ -118,7 +118,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
                 for key in self.kwargs.keys():
                     self.check_kwargs(self.plot_func[key], self.kwargs[key])
 
-            self._add_multi_plots()
+            self._add_multi_figs()
 
     def plot(self):
         """
@@ -149,9 +149,9 @@ class AnalysisPlotter(QtWidgets.QWidget):
                 self.startedPlotting.connect(self.plotting_worker.work)
 
             if dummy_widget is None:
-                self.plotting_worker.finished.connect(lambda: self._add_plots(figures=self.result_figs))
+                self.plotting_worker.finished.connect(lambda: self._add_figs(figures=self.result_figs))
             else:
-                self.plotting_worker.finished.connect(lambda: self._add_plots(figures=self.result_figs,
+                self.plotting_worker.finished.connect(lambda: self._add_figs(figures=self.result_figs,
                                                                               external_widget=dummy_widget))
 
             # Connect exceptions signal
@@ -174,10 +174,10 @@ class AnalysisPlotter(QtWidgets.QWidget):
 
             if dummy_widget is None:
                 self.plotting_worker[multi_plot_key].finished.connect(
-                    lambda: self._add_plots(figures=self.result_figs[multi_plot_key]))
+                    lambda: self._add_figs(figures=self.result_figs[multi_plot_key]))
             else:
                 self.plotting_worker[multi_plot_key].finished.connect(
-                    lambda: self._add_plots(figures=self.result_figs[multi_plot_key], external_widget=dummy_widget))
+                    lambda: self._add_figs(figures=self.result_figs[multi_plot_key], external_widget=dummy_widget))
 
             # Connect exceptions signal
             self.plotting_worker[multi_plot_key].exceptionSignal.connect(
@@ -249,7 +249,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
             else:
                 pass
 
-    def _add_plots(self, figures, external_widget=None):
+    def _add_figs(self, figures, external_widget=None):
         """
         Function for plotting one or multiple plots from a single plot_func.
         If the function returns multiple plots, respective widgets for navigation
@@ -363,10 +363,10 @@ class AnalysisPlotter(QtWidgets.QWidget):
                 else:
                     pass
 
-    def _add_multi_plots(self):
+    def _add_multi_figs(self):
         """
         Function that allows plotting from multiple plot functions at once.
-        Creates a tab widget and one tab for every plot function. Uses self._add_plots() to add plots
+        Creates a tab widget and one tab for every plot function. Uses self._add_figs() to add plots
         """
 
         if self.figures is not None:
