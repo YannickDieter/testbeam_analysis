@@ -1,4 +1,9 @@
 # -*- mode: python -*-
+''' Creates a stand alone distribution for tba.
+To create a packed installer use makeself:
+makeself --bzip2 dist/tba/ tba.bz2.run "Installer for testbeam analysis" tba
+'''
+
 import sys
 import os
 import testbeam_analysis
