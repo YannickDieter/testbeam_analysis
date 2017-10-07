@@ -9,13 +9,19 @@ import testbeam_analysis
 mod_path = os.path.dirname(testbeam_analysis.__file__)
 gui_path = os.path.join(mod_path, 'gui/main.py')
 
+# Fix missing qt.conf issue
+with open('qt.conf', 'w') as out:
+    out.write('[Paths]\n')
+    out.write('plugins = PyQt5/Qt/plugins')
+
 block_cipher = None
 
 a = Analysis([gui_path],
              # pathex=['/home/davidlp/git/testbeam_analysis/testbeam_analysis/gui'],
              # for tables
              binaries=[(os.path.join(sys.prefix, 'Library/bin/lzo2.dll'), '.')],
-             datas=[ (os.path.join(mod_path, 'gui/dut_types.yaml'), '.') ],
+             datas=[ (os.path.join(mod_path, 'gui/dut_types.yaml'), '.'),
+                     ('qt.conf', '.') ],
              hiddenimports=['setuptools.msvc',
                             'pixel_clusterizer.clusterizer',
                             'numpydoc',
@@ -46,3 +52,4 @@ coll = COLLECT(exe,
                strip=False,
                upx=False,
                name='tba')
+
