@@ -624,6 +624,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                             except (AttributeError, RuntimeError):
                                 pass
 
+                        # Enable consecutive analysis again
+                        self.run_menu.actions()[0].setEnabled(True)
+                        self.run_menu.actions()[0].setToolTip('Run consecutive analysis with default options without user interaction')
+
                         # Enable settings after/interrupted consecutive analysis
                         self.settings_menu.actions()[0].setEnabled(True)
                         self.settings_menu.setToolTipsVisible(False)
@@ -641,6 +645,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
                 else:
                     # Last tab finished
+                    # Disable consecutive analysis menu since we already run through
+                    self.run_menu.actions()[0].setEnabled(False)
+                    self.run_menu.actions()[0].setToolTip('Consecutive analysis finished')
+
                     self.p_bar_rca.setValue(len(self.tab_order))
                     self.label_rca.setText('Done!')
                     # Remove consecutive analysis progressbar
@@ -650,6 +658,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             msg = 'Can not start consecutive analysis while %s analysis is running.' % self.current_analysis_tab()
             logging.warning(msg=msg)
             return
+
+        # Disable consecutive analysis menu when started
+        self.run_menu.actions()[0].setEnabled(False)
+        self.run_menu.actions()[0].setToolTip('Running consecutive analysis...')
 
         # Disable settings during consecutive analysis
         self.settings_menu.actions()[0].setEnabled(False)
@@ -684,13 +696,19 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             # Connect starting tab and all following
             if self.tab_order.index(tab) >= self.tab_order.index(self.starting_tab_rca):
 
-                # Disable the ok buttons since following tabs are enabled before respective analysis starts
-                # due to different trigger signals
+                # Disable the ok buttons and containers since following tabs are enabled before respective analysis
+                # starts due to different trigger signals
                 try:
                     self.tw[tab].btn_ok.setDisabled(True)
                 # Alignment has been skipped in settings
                 except RuntimeError:
                     pass
+                try:
+                    self.tw[tab].container.setDisabled(True)
+                # ParallelAnalysisWidget
+                except AttributeError:
+                    for k in self.tw[tab].tw.keys():
+                        self.tw[tab].tw[k].container.setDisabled(True)
 
                 # No plotting for AlignmentTab so far, manually emit signal
                 if tab == 'Alignment':
@@ -703,7 +721,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                               lambda: self.tw['Efficiency'].plottingFinished.connect(lambda f: handle_rca(f)),
                               lambda: self.tw['Track fitting'].btn_ok.setDisabled(True),
                               lambda: self.tw['Residuals'].btn_ok.setDisabled(True),
-                              lambda: self.tw['Efficiency'].btn_ok.setDisabled(True)]:
+                              lambda: self.tw['Efficiency'].btn_ok.setDisabled(True),
+                              lambda: self.tw['Track fitting'].container.setDisabled(True),
+                              lambda: self.tw['Residuals'].container.setDisabled(True),
+                              lambda: self.tw['Efficiency'].container.setDisabled(True)]:
                         self.tw[tab].skipAlignment.connect(x)
 
                 # Noisy Pixel analysis updates Clustering tab which thus needs to be reconnected to consecutive analysis
