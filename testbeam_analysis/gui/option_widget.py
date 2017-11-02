@@ -30,7 +30,7 @@ class OptionSlider(QtWidgets.QWidget):  # FIXME: steps size != 1 not supported
         self.edit.setAlignment(QtCore.Qt.AlignCenter)
         validator = QtGui.QDoubleValidator()
         self.edit.setValidator(validator)
-        self.edit.setMaxLength(3)
+        #self.edit.setMaxLength(3)  #FIXME: No need for only 3 digits
         size_policy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred,
                                             QtWidgets.QSizePolicy.Preferred)
         self.edit.setSizePolicy(size_policy)
@@ -235,7 +235,7 @@ class OptionMultiSlider(QtWidgets.QWidget):
             edit = QtWidgets.QLineEdit()
             edit.setAlignment(QtCore.Qt.AlignCenter)
             edit.setValidator(QtGui.QDoubleValidator())
-            edit.setMaxLength(3)
+            #edit.setMaxLength(3)  #FIXME: No need for only 3 digits
             size_policy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred,
                                                 QtWidgets.QSizePolicy.Preferred)
             edit.setSizePolicy(size_policy)
