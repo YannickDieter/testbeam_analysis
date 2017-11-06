@@ -221,11 +221,15 @@ class ExceptionWindow(QtWidgets.QMainWindow):
 
         # Layout for buttons
         layout_buttons = QtWidgets.QHBoxLayout()
-        layout_buttons.addStretch(1)
 
         # Textbrowser to display traceback
-        browser_traceback = QtWidgets.QTextBrowser()
-        browser_traceback.setText(self.traceback)
+        self.browser_traceback = QtWidgets.QTextBrowser()
+        self.browser_traceback.setText(str(self.exception))
+
+        # Button to switch between traceback and exception message
+        self.btn_switch = QtWidgets.QPushButton('Traceback')
+        self.btn_switch.setToolTip('Switch between exception message and full traceback')
+        self.btn_switch.clicked.connect(self.switch_text)
 
         # Button to safe traceback to file
         btn_safe = QtWidgets.QPushButton('Save')
@@ -238,21 +242,23 @@ class ExceptionWindow(QtWidgets.QMainWindow):
         btn_ok.clicked.connect(self.close)
 
         # Add buttons to layout
+        layout_buttons.addWidget(self.btn_switch)
+        layout_buttons.addStretch(1)
         layout_buttons.addWidget(btn_safe)
         layout_buttons.addSpacing(h_space)
         layout_buttons.addWidget(btn_ok)
 
         # Dock in which text browser is placed
-        browser_dock = QtWidgets.QDockWidget()
-        browser_dock.setWidget(browser_traceback)
-        browser_dock.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea)
-        browser_dock.setFeatures(QtWidgets.QDockWidget.NoDockWidgetFeatures)
-        browser_dock.setWindowTitle('Traceback:')
+        self.browser_dock = QtWidgets.QDockWidget()
+        self.browser_dock.setWidget(self.browser_traceback)
+        self.browser_dock.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea)
+        self.browser_dock.setFeatures(QtWidgets.QDockWidget.NoDockWidgetFeatures)
+        self.browser_dock.setWindowTitle(str(self.exc_type) + ' message:')
 
         # Add to main layout
         main_layout.addLayout(layout_labels)
         main_layout.addSpacing(v_space)
-        main_layout.addWidget(browser_dock)
+        main_layout.addWidget(self.browser_dock)
         main_layout.addLayout(layout_buttons)
 
     def safe_traceback(self):
@@ -273,6 +279,17 @@ class ExceptionWindow(QtWidgets.QMainWindow):
 
         else:
             pass
+
+    def switch_text(self):
+
+        if self.browser_dock.windowTitle() == str(self.exc_type) + ' message:':
+            self.browser_dock.setWindowTitle('Traceback:')
+            self.browser_traceback.setText(self.traceback)
+            self.btn_switch.setText('Exception')
+        else:
+            self.browser_dock.setWindowTitle(str(self.exc_type) + ' message:')
+            self.browser_traceback.setText(str(self.exception))
+            self.btn_switch.setText('Traceback')
 
     def closeEvent(self, QCloseEvent):
 
