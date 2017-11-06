@@ -15,7 +15,7 @@ from collections import OrderedDict, defaultdict
 from numpydoc.docscrape import FunctionDoc
 from PyQt5 import QtWidgets, QtCore, QtGui
 
-from testbeam_analysis.gui import option_widget
+from testbeam_analysis.gui import option_widgets
 from testbeam_analysis.gui.analysis_plotter import AnalysisPlotter
 from testbeam_analysis.gui.analysis_worker import AnalysisWorker
 from testbeam_analysis.gui.analysis_bar import AnalysisBar
@@ -63,9 +63,11 @@ class AnalysisWidget(QtWidgets.QWidget):
 
     # Signal emitted after all funcs are called
     analysisDone = QtCore.pyqtSignal(list)
+
     # Signal emitted if exceptions occur
     exceptionSignal = QtCore.pyqtSignal(Exception, str, str, str)
 
+    # Signal emitted when plotting is finished
     plottingFinished = QtCore.pyqtSignal(str)
 
     def __init__(self, parent, setup, options, name, tab_list=None):
@@ -304,7 +306,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         if ('scalar' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
                         'int' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
                 ('iterable' in dtype and 'iterable of iterable' not in dtype and 'duts' not in name)):
-            widget = option_widget.OptionMultiSlider(
+            widget = option_widgets.OptionMultiSlider(
                 name=name, labels=self.setup['dut_names'],
                 default_value=default_value,
                 optional=optional, tooltip=tooltip, parent=self)
@@ -320,17 +322,17 @@ class AnalysisWidget(QtWidgets.QWidget):
             if name in ['Align duts']:
                 labels_x = ['Align %i.' % (i + 1) for i in range(self.setup['n_duts'])]
 
-            widget = option_widget.OptionMultiBox(
+            widget = option_widgets.OptionMultiBox(
                 name=name, labels_x=labels_x, default_value=default_value, optional=optional,
                 tooltip=tooltip, labels_y=labels_y, parent=self)
         elif 'str' in dtype:
-            widget = option_widget.OptionText(
+            widget = option_widgets.OptionText(
                 name, default_value, optional, tooltip, parent=self)
         elif 'int' in dtype or 'float' in dtype:
-            widget = option_widget.OptionSlider(
+            widget = option_widgets.OptionSlider(
                 name, default_value, optional, tooltip, dtype, parent=self)
         elif 'bool' in dtype:
-            widget = option_widget.OptionBool(
+            widget = option_widgets.OptionBool(
                 name, default_value, optional, tooltip, parent=self)
         else:
             raise NotImplementedError('Cannot use type %s', dtype)

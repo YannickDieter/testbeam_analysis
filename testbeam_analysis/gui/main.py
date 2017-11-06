@@ -12,7 +12,7 @@ from testbeam_analysis.gui.sub_windows import SettingsWindow, ExceptionWindow
 from testbeam_analysis.gui.analysis_logger import AnalysisLogger, AnalysisStream
 from testbeam_analysis.gui.data import DataTab
 from testbeam_analysis.gui.setup import SetupTab
-from testbeam_analysis.gui import tab_widget
+from testbeam_analysis.gui import tab_widgets
 
 PROJECT_NAME = 'Testbeam Analysis'
 GUI_AUTHORS = 'Pascal Wolf, David-Leon Pohl'
@@ -378,55 +378,55 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 widget = SetupTab(parent=self.tabs)
 
             elif name == 'Noisy Pixel':
-                widget = tab_widget.NoisyPixelsTab(parent=self.tabs,
-                                                   setup=self.setup,
-                                                   options=self.options,
-                                                   name=name,
-                                                   tab_list='Clustering')
+                widget = tab_widgets.NoisyPixelsTab(parent=self.tabs,
+                                                    setup=self.setup,
+                                                    options=self.options,
+                                                    name=name,
+                                                    tab_list='Clustering')
             elif name == 'Clustering':
-                widget = tab_widget.ClusterPixelsTab(parent=self.tabs,
+                widget = tab_widgets.ClusterPixelsTab(parent=self.tabs,
+                                                      setup=self.setup,
+                                                      options=self.options,
+                                                      name=name,
+                                                      tab_list='Pre-alignment')
+
+            elif name == 'Pre-alignment':
+                widget = tab_widgets.PrealignmentTab(parent=self.tabs,
                                                      setup=self.setup,
                                                      options=self.options,
                                                      name=name,
-                                                     tab_list='Pre-alignment')
-
-            elif name == 'Pre-alignment':
-                widget = tab_widget.PrealignmentTab(parent=self.tabs,
-                                                    setup=self.setup,
-                                                    options=self.options,
-                                                    name=name,
-                                                    tab_list='Track finding')
+                                                     tab_list='Track finding')
 
             elif name == 'Track finding':
-                widget = tab_widget.TrackFindingTab(parent=self.tabs,
-                                                    setup=self.setup,
-                                                    options=self.options,
-                                                    name=name,
-                                                    tab_list='Alignment')
+                widget = tab_widgets.TrackFindingTab(parent=self.tabs,
+                                                     setup=self.setup,
+                                                     options=self.options,
+                                                     name=name,
+                                                     tab_list='Alignment')
             elif name == 'Alignment':
-                widget = tab_widget.AlignmentTab(parent=self.tabs,
-                                                 setup=self.setup,
-                                                 options=self.options,
-                                                 name=name,
-                                                 tab_list='Track fitting')
-            elif name == 'Track fitting':
-                widget = tab_widget.TrackFittingTab(parent=self.tabs,
-                                                    setup=self.setup,
-                                                    options=self.options,
-                                                    name=name,
-                                                    tab_list=['Residuals', 'Efficiency'])
-            elif name == 'Residuals':
-                widget = tab_widget.ResidualTab(parent=self.tabs,
-                                                setup=self.setup,
-                                                options=self.options,
-                                                name=name,
-                                                tab_list='Efficiency')
-            elif name == 'Efficiency':
-                widget = tab_widget.EfficiencyTab(parent=self.tabs,
+                widget = tab_widgets.AlignmentTab(parent=self.tabs,
                                                   setup=self.setup,
                                                   options=self.options,
                                                   name=name,
-                                                  tab_list='Last')  # Random string for last tab, NOT in self.tab_order
+                                                  tab_list='Track fitting')
+            elif name == 'Track fitting':
+                widget = tab_widgets.TrackFittingTab(parent=self.tabs,
+                                                     setup=self.setup,
+                                                     options=self.options,
+                                                     name=name,
+                                                     tab_list=['Residuals', 'Efficiency'])
+            elif name == 'Residuals':
+                widget = tab_widgets.ResidualTab(parent=self.tabs,
+                                                 setup=self.setup,
+                                                 options=self.options,
+                                                 name=name,
+                                                 tab_list='Efficiency')
+            elif name == 'Efficiency':
+                widget = tab_widgets.EfficiencyTab(parent=self.tabs,
+                                                   setup=self.setup,
+                                                   options=self.options,
+                                                   name=name,
+                                                   tab_list='Last')  # Random string for last tab, NOT in self.tab_order
             else:
                 continue
 
@@ -577,7 +577,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
     def run_consecutive_analysis(self):
         """
         Method to start a consecutive call of all analysis functions with their default values
-        as defined in tab_widget.py. Acronym rca==run constructive analysis
+        as defined in tab_widgets.py. Acronym rca==run constructive analysis
         """
 
         def handle_rca(tab=None, interrupt=False):
@@ -616,10 +616,15 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                             try:
 
                                 if self.tab_order.index(tab_) >= self.tab_order.index(self.current_analysis_tab()):
+
                                     # Disconnect
                                     self.tw[tab_].plottingFinished.disconnect()
+
                                     # Enable OK button of following tabs
                                     self.tw[tab_].btn_ok.setDisabled(False)
+
+                                    # Enable container of following tabs
+                                    self.tw[tab_].container.setDisabled(False)
 
                             except (AttributeError, RuntimeError):
                                 pass

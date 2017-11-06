@@ -294,3 +294,17 @@ class ExceptionWindow(QtWidgets.QMainWindow):
     def closeEvent(self, QCloseEvent):
 
         self.exceptionRead.emit()
+
+
+class IPrealignmentWindow(QtWidgets.QMainWindow):
+
+    dataReceived = QtCore.pyqtSignal()
+
+    def __init__(self, parent=None):
+
+        super(IPrealignmentWindow, self).__init__(parent)
+
+        # Make this window blocking parent window
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+
+        pass
