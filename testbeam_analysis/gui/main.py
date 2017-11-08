@@ -257,7 +257,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                     self.tabs.setTabEnabled(i, enable)
 
         # Dis/enable specific tab
-        elif type(tabs) is unicode:
+        elif type(tabs) is unicode or type(tabs) is str:
             if tabs in self.tab_order:
                 self.tabs.setTabEnabled(self.tab_order.index(tabs), enable)
 
@@ -311,6 +311,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.handle_tabs(tabs=tab_names))
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.tab_completed(tab_names))
+                self.tw[name].rerunSignal.connect(lambda tab: self.rerun_tab(tab=tab))
                 self.tw[name].exceptionSignal.connect(lambda e, trc_bck, tab, cause: self.handle_exceptions(exception=e,
                                                                                                             trace_back=trc_bck,
                                                                                                             tab=tab,
@@ -322,7 +323,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 else:
                     pass
 
-    def update_tabs(self, data=None, tabs=None, skip=None, exception=False):
+    def update_tabs(self, data=None, tabs=None, skip=None, exception=False, force=False):
         """
         Updates the setup and options with data from the SetupTab and then updates the tabs
 
@@ -330,6 +331,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         :param data: dict with all information necessary to perform analysis, if None only update tabs
         :param skip: str or list of tab names which should be skipped when updating tabs
         :param exception: bool determine whether to update a running analysis tab; if exception is thrown, update
+        :param force: bool whether or not to update previously finished tabs
         """
 
         # Save users current tab position
@@ -362,13 +364,14 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                     update_tabs.remove(skip)
 
         # Remove tabs from being updated if they are already finished
-        for t in self.tab_order:
-            try:
-                if self.tw[t].isFinished:
-                    if t in update_tabs:
-                        update_tabs.remove(t)
-            except AttributeError:
-                pass
+        if not force:
+            for t in self.tab_order:
+                try:
+                    if self.tw[t].isFinished:
+                        if t in update_tabs:
+                            update_tabs.remove(t)
+                except AttributeError:
+                    pass
 
         # Make temporary dict for updated tabs
         tmp_tw = {}
@@ -439,7 +442,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 try:
                     if self.tw[tab].analysis_thread.isRunning() and not exception:
                         continue
-                except AttributeError:
+                except (AttributeError, RuntimeError):
                     pass
 
                 # Replace tabs in self.tw with updated tabs
@@ -536,6 +539,40 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                   ' ...if we had implemented loading sessions, which we have not.' % session
         logging.info(message)
         pass
+
+    def rerun_tab(self, tab):
+        """
+        Reruns tab and resets/disables all subsequent tabs
+        :param tab:
+        """
+
+        if self.tw[self.current_analysis_tab()].analysis_thread.isRunning() or\
+                self.tw[self.current_analysis_tab()].plotting_thread.isRunning():
+            msg = 'Can not re-run %s while %s analysis is running.' % (tab, self.current_analysis_tab())
+            logging.warning(msg=msg)
+            return
+
+        subsequent_tabs = []
+        for t in self.tab_order:
+            if self.tab_order.index(t) > self.tab_order.index(tab) and self.tw[t].isFinished:
+                subsequent_tabs.append(t)
+
+        if subsequent_tabs:
+            msg = 'Do you want to re-run %s analysis? All subsequent and previously run tabs (%s)' \
+                  ' will be reset and need to be run again.' % (tab, ', '.join(subsequent_tabs))
+        else:
+            msg = 'Do you want to re-run %s analysis? All subsequent tabs will be reset.' % tab
+        reply = QtWidgets.QMessageBox.question(self, 'Re-run %s tab?' % tab, msg, QtWidgets.QMessageBox.Yes,
+                                                   QtWidgets.QMessageBox.Cancel)
+
+        if reply == QtWidgets.QMessageBox.Yes:
+            for tab_ in self.tab_order:
+                if self.tab_order.index(tab_) >= self.tab_order.index(tab):
+                    if tab_ != tab:
+                        self.tabs.setTabEnabled(self.tab_order.index(tab_), False)
+                    self.update_tabs(tabs=tab_, force=True)
+        else:
+            pass
 
     def new_analysis(self):
         """

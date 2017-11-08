@@ -70,6 +70,8 @@ class AnalysisWidget(QtWidgets.QWidget):
     # Signal emitted when plotting is finished
     plottingFinished = QtCore.pyqtSignal(str)
 
+    rerunSignal = QtCore.pyqtSignal(str)
+
     def __init__(self, parent, setup, options, name, tab_list=None):
         super(AnalysisWidget, self).__init__(parent)
         self.setup = setup
@@ -115,11 +117,24 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.layout_options.addLayout(self.opt_fixed)
         self.layout_options.addStretch(0)
 
-        # Proceed button and progressbar
+        # Layout for proceed and rerun button
+        self.layout_buttons = QtWidgets.QHBoxLayout()
+        # Rerun, proceed button and progressbar
+        self.btn_rerun = QtWidgets.QPushButton(' Re-run')
+        self.btn_rerun.clicked.connect(lambda: self.rerunSignal.emit(self.name))
+        self.btn_rerun.setToolTip('Re-runs current tab and resets all following, dependent tabs')
+        self.btn_rerun.setVisible(False)
+        icon_rerun = QtWidgets.qApp.style().standardIcon(QtWidgets.qApp.style().SP_BrowserReload)
+        self.btn_rerun.setIcon(icon_rerun)
+        self.analysisDone.connect(lambda: self.btn_rerun.setVisible(True))
         self.btn_ok = QtWidgets.QPushButton('Ok')
         self.btn_ok.clicked.connect(lambda: self._call_funcs())
         self.p_bar = AnalysisBar()
         self.p_bar.setVisible(False)
+
+        # Add buttons to layout
+        self.layout_buttons.addWidget(self.btn_rerun)
+        self.layout_buttons.addWidget(self.btn_ok)
 
         # Container widget to disable all but ok button after perfoming analysis
         self.container = QtWidgets.QWidget()
@@ -131,7 +146,7 @@ class AnalysisWidget(QtWidgets.QWidget):
 
         # Add container and ok button to right widget
         self.scroll_widget.layout().addWidget(self.container)
-        self.scroll_widget.layout().addWidget(self.btn_ok)
+        self.scroll_widget.layout().addLayout(self.layout_buttons)
 
         # Make right widget scroll able
         self.scroll_area = QtWidgets.QScrollArea()
@@ -544,6 +559,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
     parallelAnalysisDone = QtCore.pyqtSignal(list)
     exceptionSignal = QtCore.pyqtSignal(Exception, str, str, str)
     plottingFinished = QtCore.pyqtSignal(str)
+    rerunSignal = QtCore.pyqtSignal(str)
 
     def __init__(self, parent, setup, options, name, tab_list=None):
 
@@ -553,8 +569,16 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.main_layout)
 
-        # Add sub-layout and ok button and progressbar
+        # Add sub-layout and rerun / ok button and progressbar
         self.sub_layout = QtWidgets.QHBoxLayout()
+        self.btn_rerun = QtWidgets.QPushButton(' Re-run')
+        self.btn_rerun.clicked.connect(lambda: self.rerunSignal.emit(self.name))
+        self.btn_rerun.setToolTip('Re-runs current tab and resets all following, dependent tabs')
+        self.btn_rerun.setVisible(False)
+        icon_rerun = QtWidgets.qApp.style().standardIcon(QtWidgets.qApp.style().SP_BrowserReload)
+        self.btn_rerun.setIcon(icon_rerun)
+        self.parallelAnalysisDone.connect(lambda: self.btn_rerun.setVisible(True))
+        self.parallelAnalysisDone.connect(lambda: self.handle_sub_layout(tab=self.tabs.currentIndex()))
         self.btn_ok = QtWidgets.QPushButton('Ok')
         self.btn_ok.clicked.connect(lambda: self._call_parallel_funcs())
         self.p_bar = AnalysisBar()
@@ -562,8 +586,10 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
         # Set alignment in sub-layout
         self.sub_layout.addWidget(self.p_bar)
+        self.sub_layout.addWidget(self.btn_rerun)
         self.sub_layout.addWidget(self.btn_ok)
         self.sub_layout.setAlignment(self.p_bar, QtCore.Qt.AlignLeading)
+        self.sub_layout.setAlignment(self.btn_rerun, QtCore.Qt.AlignLeading)
         self.sub_layout.setAlignment(self.btn_ok, QtCore.Qt.AlignTrailing)
 
         # Tab related widgets
@@ -659,11 +685,16 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
     def handle_sub_layout(self, tab):
 
-        offset = 10
+        offset = 10 if not self.btn_rerun.isVisible() else 5
         sub_widths = self.tw[self.tabs.tabText(tab)].widget_splitter.sizes()
 
+        self.btn_rerun.setFixedWidth(sub_widths[1] / 2 + offset)
         self.p_bar.setFixedWidth(sub_widths[0] + offset)
-        self.btn_ok.setFixedWidth(sub_widths[1] + offset)
+
+        if not self.btn_rerun.isVisible():
+            self.btn_ok.setFixedWidth(sub_widths[1] + offset)
+        else:
+            self.btn_ok.setFixedWidth(sub_widths[1] / 2 + offset)
 
     def add_parallel_function(self, func):
 
