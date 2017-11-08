@@ -545,12 +545,15 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         Reruns tab and resets/disables all subsequent tabs
         :param tab:
         """
-
-        if self.tw[self.current_analysis_tab()].analysis_thread.isRunning() or\
-                self.tw[self.current_analysis_tab()].plotting_thread.isRunning():
-            msg = 'Can not re-run %s while %s analysis is running.' % (tab, self.current_analysis_tab())
-            logging.warning(msg=msg)
-            return
+        try:
+            if self.tw[self.current_analysis_tab()].analysis_thread.isRunning() or\
+                    self.tw[self.tab_order[self.tab_order.index(self.current_analysis_tab())-1]].plotting_thread.isRunning():
+                msg = 'Can not re-run %s while %s analysis is running.' % (tab, self.current_analysis_tab())
+                logging.warning(msg=msg)
+                return
+        # plotting thread has already been deleted so plotting is finished
+        except RuntimeError:
+            pass
 
         subsequent_tabs = []
         for t in self.tab_order:
