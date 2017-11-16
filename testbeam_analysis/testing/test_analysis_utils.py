@@ -75,8 +75,9 @@ class TestAnalysisUtils(unittest.TestCase):
 
         common_event_number = np.array([0, 1, 1, 2, 3, 3, 3, 4, 4], dtype=np.int64)
 
-        self.assertTrue(np.all(test_tools.nan_to_num(analysis_utils.map_cluster(common_event_number, clusters)) ==
-                               test_tools.nan_to_num(result[:common_event_number.shape[0]])))
+        data_equal = test_tools.nan_equal(first_array=analysis_utils.map_cluster(common_event_number, clusters),
+                                          second_array=result[:common_event_number.shape[0]])
+        self.assertTrue(data_equal)
 
     def test_analysis_utils_in1d_events(self):  # check compiled get_in1d_sorted function
         event_numbers = np.array([[0, 0, 2, 2, 2, 4, 5, 5, 6, 7, 7, 7, 8], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=np.int64)
