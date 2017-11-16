@@ -167,10 +167,10 @@ def select_hits(hit_file, max_hits=None, condition=None, track_quality=None,
                         # Calculate number of hits to add for this chunk
                         # Fraction of hits to add per chunk
                         hit_fraction = max_hits / float(total_hits)
-                        sel = np.ceil(np.linspace(0, hits.shape[0],
+                        sel = np.ceil(np.linspace(0,
+                                                  hits.shape[0],
                                                   int(hit_fraction * n_hits),
-                                                  endpoint=False)).astype(
-                                                      np.int)
+                                                  endpoint=False)).astype(np.int32)
                         sel = sel[sel < hits.shape[0]]
                         hits = hits[sel]
 

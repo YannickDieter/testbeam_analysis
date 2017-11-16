@@ -74,9 +74,9 @@ if __name__ == '__main__':
     hits_mc_2 = tracks_mc[:, 0] + (tracks_mc[:, 1] - tracks_mc[:, 0]) / 2.  # real hit position in DUT
 
     # Digitized hit info (firing pixels) for all 3 planes
-    hits_reco_1 = ((tracks_mc[:, 0] - plane_offsets[0]) / telescope_pitch).astype(np.int)
-    hits_reco_2 = ((tracks_mc[:, 0] + (tracks_mc[:, 1] - tracks_mc[:, 0]) / 2.) / DUT_pitch).astype(np.int)
-    hits_reco_3 = ((tracks_mc[:, 1] - plane_offsets[2]) / telescope_pitch).astype(np.int)
+    hits_reco_1 = ((tracks_mc[:, 0] - plane_offsets[0]) / telescope_pitch).astype(np.int32)
+    hits_reco_2 = ((tracks_mc[:, 0] + (tracks_mc[:, 1] - tracks_mc[:, 0]) / 2.) / DUT_pitch).astype(np.int32)
+    hits_reco_3 = ((tracks_mc[:, 1] - plane_offsets[2]) / telescope_pitch).astype(np.int32)
     # Correct for int conversion that int(]-1 .. 1[) = 0
     hits_reco_1[tracks_mc[:, 0] - plane_offsets[0] < 0] = hits_reco_1[tracks_mc[:, 0] - plane_offsets[0] < 0] - 1
     hits_reco_2[tracks_mc[:, 0] + (tracks_mc[:, 1] - tracks_mc[:, 0]) / 2. < 0] = hits_reco_2[tracks_mc[:, 0] + (tracks_mc[:, 1] - tracks_mc[:, 0]) / 2. < 0] - 1

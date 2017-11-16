@@ -785,10 +785,10 @@ class SimulateData(object):
         # Calculate the number of tracks per event
         if self.tracks_per_event_sigma > 0:
             n_tracks_per_event = np.random.normal(
-                self.tracks_per_event, self.tracks_per_event_sigma, n_events).astype(np.int)
+                self.tracks_per_event, self.tracks_per_event_sigma, n_events).astype(np.int32)
         else:
             n_tracks_per_event = np.ones(
-                n_events, dtype=np.int) * self.tracks_per_event
+                n_events, dtype=np.int32) * self.tracks_per_event
         # One cannot have less than 0 tracks per event, this will be triggered
         # events without a track
         n_tracks_per_event[n_tracks_per_event < 0] = 0

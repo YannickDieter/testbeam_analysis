@@ -371,7 +371,7 @@ def get_data_in_event_range(array, event_start=None, event_stop=None, assume_sor
         else:
             if event_number[-1] < event_stop:
                 max_index_data = event_number.shape[0]
-            else: 
+            else:
                 max_index_data = np.argmax(event_number >= event_stop)
 
         if min_index_data < 0:
@@ -669,10 +669,10 @@ def get_mean_efficiency(array_pass, array_total, method=0):
           4: Use a special Binomial efficiency fit. Gives best mean efficiency but unphysical symmetric error
              bars. Further info: https://root.cern.ch/doc/master/classTBinomialEfficiencyFitter.html
     '''
-    
+
     n_bins = np.ma.count(array_pass)
     logging.info('Calculate the mean efficiency from %d pixels', n_bins)
-    
+
     if method == 0:
         def weighted_avg_and_std(values, weights):  # http://stackoverflow.com/questions/2413522/weighted-standard-deviation-in-numpy
             average = np.average(values, weights=weights)
@@ -686,7 +686,7 @@ def get_mean_efficiency(array_pass, array_total, method=0):
             from ROOT import TH1D, TEfficiency, TF1, TBinomialEfficiencyFitter
         except ImportError:
             raise RuntimeError('To use these method you have to install CERN ROOT with python bindings.')
-    
+
         # Convert not masked numpy array values to 1D ROOT double histogram
         def fill_1d_root_hist(array, name):
             length = np.ma.count(array_pass)
@@ -694,7 +694,7 @@ def get_mean_efficiency(array_pass, array_total, method=0):
             for index, value in enumerate(np.ma.compressed(array).ravel()):
                 root_hist.SetBinContent(index, value)
             return root_hist
-        
+
         if method == 1:
             # The following combines all pixel and gives correct
             # statistical errors but does not take the systematic
@@ -710,7 +710,7 @@ def get_mean_efficiency(array_pass, array_total, method=0):
             # The following fits the efficiency with a constant but
             # it gives symmetric error bars, thus unphysical results
             # This is not understood yet and thus not used
-            
+
             # Convert numpy array to ROOT hists
             hist_pass = fill_1d_root_hist(array_pass, 'h_pass')
             hist_total = fill_1d_root_hist(array_total, 'h_total')
@@ -937,7 +937,7 @@ def hough_transform(img, theta_res=1.0, rho_res=1.0, return_edges=False):
     cos_t = np.cos(thetas)
     sin_t = np.sin(thetas)
 
-    accumulator = np.zeros((rhos.size, thetas.size), dtype=np.int)
+    accumulator = np.zeros((rhos.size, thetas.size), dtype=np.int32)
     y_idxs, x_idxs = np.nonzero(img)
 
     @njit
@@ -968,10 +968,10 @@ def hough_transform(img, theta_res=1.0, rho_res=1.0, return_edges=False):
 
 def get_data(path, output=None, fail_on_overwrite=False):
     ''' Downloads data (eg. for examples, fixtures).
-    
+
         Uses data in a public scibo folder. If you want
         write access contact the maintainer.
-        
+
         Parameters
         ----------
         path : string
@@ -1023,5 +1023,5 @@ def get_data(path, output=None, fail_on_overwrite=False):
                        filename=os.path.join(output_path, output))
     elif fail_on_overwrite:
         raise RuntimeError('The files %s exists already', output)
-    
+
     return os.path.join(output_path, output)
