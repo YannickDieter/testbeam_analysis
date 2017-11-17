@@ -9,6 +9,8 @@ from math import ceil
 import numpy as np
 import tables as tb
 import matplotlib as mpl
+import matplotlib.gridspec as gridspec
+from matplotlib import ticker
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.backends.backend_agg import FigureCanvas
 import matplotlib.pyplot as plt
@@ -18,10 +20,22 @@ from matplotlib import colors, cm
 from mpl_toolkits.mplot3d import Axes3D  # needed for 3d plotting although it is shown as not used
 from matplotlib.widgets import Slider, Button
 from scipy.optimize import curve_fit
+from scipy.optimize import fsolve
 
 import testbeam_analysis.tools.analysis_utils
 
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")  # Plot backend error not important
+
+
+# class to define the middle of a colorbar
+class MidpointNormalize(colors.Normalize):
+    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+        self.midpoint = midpoint
+        colors.Normalize.__init__(self, vmin, vmax, clip)
+
+    def __call__(self, value, clip=None):
+        x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        return np.ma.masked_array(np.interp(value, x, y))
 
 
 def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=None, y_axis_title=None, z_min=0, z_max=None):
@@ -1333,3 +1347,193 @@ def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=Non
                 ax.grid()
                 ax.set_xlim(min(edges), max(edges))
                 output_pdf.savefig(fig)
+
+
+def plot_in_pixel_hit_hist(x_intersections_hist, y_intersections_hist, intersections_2d_hist, pixel_pitch, bins, output_pdf=None, plot_title=None, z_max=None):
+    '''Plotting in-pixel-hit-distributions for cluster sizes between 1 and 4.
+    '''
+    logging.info('Plotting In-Pixel-Hit-Distribution for CS 1 - 4')
+    if not output_pdf:
+        return
+    if z_max is None:
+        if intersections_2d_hist.all() is np.ma.masked:  # check if masked array is fully masked
+            z_max = 1
+        else:
+            z_max = ceil(intersections_2d_hist.max())
+
+    bin_center_x = (bins[0][1:] + bins[0][:-1]) / 2.0  # center of bin
+    bin_center_y = (bins[1][1:] + bins[1][:-1]) / 2.0  # center of bin
+
+    fig = Figure(figsize=(12., 12.))
+    _ = FigureCanvas(fig)
+
+    # colors
+    cmap = plt.cm.get_cmap('viridis')
+    plot_color = mpl.colors.to_hex(cmap(.2), keep_alpha=True)
+
+    # setup plot
+    gs1 = gridspec.GridSpec(2, 2, width_ratios=[3, 1], height_ratios=[1, 3])
+    gs1.update(wspace=0.05, hspace=0.05)
+    axHistx = fig.add_subplot(gs1[:-1, :-1])
+    axHisty = fig.add_subplot(gs1[-1, -1])
+    axHeatmap = fig.add_subplot(gs1[-1, :-1])
+
+    axHisty.get_yaxis().set_ticklabels([])
+    axHistx.get_xaxis().set_ticklabels([])
+    axHistx.set_ylabel('#', fontsize=14)
+    axHisty.set_xlabel('#', fontsize=14)
+    axHeatmap.set_xlabel('$x_\mathrm{track}$ / $\mathrm{\mu}$m', fontsize=14)
+    axHeatmap.set_ylabel('$y_\mathrm{track}$ / $\mathrm{\mu}$m', fontsize=14)
+    axHeatmap.set_aspect('equal')
+    _ = [tick.label.set_fontsize(14) for tick in axHistx.yaxis.get_major_ticks()]
+    _ = [tick.label.set_fontsize(14) for tick in axHisty.xaxis.get_major_ticks()]
+    _ = [tick.label.set_fontsize(14) for tick in axHeatmap.yaxis.get_major_ticks()]
+    _ = [tick.label.set_fontsize(14) for tick in axHeatmap.xaxis.get_major_ticks()]
+    nticks = plt.MaxNLocator(4)
+    formatter = ticker.ScalarFormatter(useMathText=True)
+    formatter.set_scientific(True)
+    formatter.set_powerlimits((-1, 1))
+    axHistx.yaxis.set_major_formatter(formatter)
+    axHistx.yaxis.set_major_locator(nticks)
+    axHisty.xaxis.set_major_formatter(formatter)
+    axHisty.xaxis.set_major_locator(nticks)
+    axHeatmap.legend(loc='upper right')
+    if plot_title is not None:
+        axHistx.set_title(plot_title)
+
+    # plot in pixel hit distribution and projections on top of axes
+    heatmap_cs = axHeatmap.imshow(intersections_2d_hist, origin='lower', interpolation='none', aspect="auto", extent=[0.0, bins[0][-1], 0.0, bins[1][-1]], cmap=cmap, clim=(0, z_max))
+    axHistx.bar(bin_center_x, x_intersections_hist, color=plot_color, width=np.mean(np.diff(bins[0])))
+    axHisty.barh(bin_center_y, y_intersections_hist, color=plot_color, height=np.mean(np.diff(bins[1])))
+
+    # colorbar
+    cbar = fig.colorbar(heatmap_cs, ax=axHisty)
+    cbar.ax.tick_params(labelsize=14)
+
+    # adjust plot limits
+    axHistx.set_xlim(0., pixel_pitch[0])
+    axHisty.set_ylim(0., pixel_pitch[1])
+    axHistx.set_ylim(bottom=0.8 * x_intersections_hist.min())
+    axHisty.set_xlim(left=0.8 * y_intersections_hist.min())
+
+    output_pdf.savefig(fig)
+
+
+def plot_in_pixel_hit_hist_with_eff_pitch(x_intersections_hist_cs_1, x_intersections_hist_cs_2, y_intersections_hist_cs_1, y_intersections_hist_cs_2, intersections_2d_hist, fit_results, pixel_pitch, bins, effective_pitch, output_pdf=None, plot_title=None):
+    '''Plotting in-pixel-hit-distributions for cluster sizes between 1 and 4.
+    '''
+    logging.info('Plotting Effective CS-1-Pitch')
+    if not output_pdf:
+        return
+
+    bin_center_x = (bins[0][1:] + bins[0][:-1]) / 2.0  # center of bin
+    bin_center_y = (bins[1][1:] + bins[1][:-1]) / 2.0  # center of bin
+
+    fig = Figure(figsize=(12., 12.))
+    _ = FigureCanvas(fig)
+
+    # colors
+    cmap = plt.cm.get_cmap('RdBu')
+    plot_color_1 = mpl.colors.to_hex(cmap(.9), keep_alpha=True)
+    plot_color_2 = mpl.colors.to_hex(cmap(.1), keep_alpha=True)
+
+    # setup plot
+    gs1 = gridspec.GridSpec(2, 2, width_ratios=[3, 1], height_ratios=[1, 3])
+    gs1.update(wspace=0.05, hspace=0.05)
+    axHistx = fig.add_subplot(gs1[:-1, :-1])
+    axHisty = fig.add_subplot(gs1[-1, -1])
+    axHeatmap = fig.add_subplot(gs1[-1, :-1])
+
+    axHisty.get_yaxis().set_ticklabels([])
+    axHistx.get_xaxis().set_ticklabels([])
+    axHistx.set_ylabel('#', fontsize=14)
+    axHisty.set_xlabel('#', fontsize=14)
+    axHeatmap.set_xlabel('$x_\mathrm{track}$ / $\mathrm{\mu}$m', fontsize=14)
+    axHeatmap.set_ylabel('$y_\mathrm{track}$ / $\mathrm{\mu}$m', fontsize=14)
+    axHeatmap.set_aspect('equal')
+    _ = [tick.label.set_fontsize(14) for tick in axHistx.yaxis.get_major_ticks()]
+    _ = [tick.label.set_fontsize(14) for tick in axHisty.xaxis.get_major_ticks()]
+    _ = [tick.label.set_fontsize(14) for tick in axHeatmap.yaxis.get_major_ticks()]
+    _ = [tick.label.set_fontsize(14) for tick in axHeatmap.xaxis.get_major_ticks()]
+    nticks = plt.MaxNLocator(4)
+    formatter = ticker.ScalarFormatter(useMathText=True)
+    formatter.set_scientific(True)
+    formatter.set_powerlimits((-1, 1))
+    axHistx.yaxis.set_major_formatter(formatter)
+    axHistx.yaxis.set_major_locator(nticks)
+    axHisty.xaxis.set_major_formatter(formatter)
+    axHisty.xaxis.set_major_locator(nticks)
+
+    if plot_title is not None:
+        axHistx.set_title(plot_title)
+
+    x_gauss_x = np.arange(0.0, pixel_pitch[0], step=0.001)
+    x_gauss_y = np.arange(0.0, pixel_pitch[1], step=0.001)
+
+    # unpack fit results
+    fit_cs_1_x_sliced, fit_cs_1_y_sliced, fit_cs_2_x_sliced, fit_cs_2_y_sliced = fit_results
+
+    plot_fit_x_1_normed = testbeam_analysis.tools.analysis_utils.gauss_offset(x_gauss_x, *fit_cs_1_x_sliced) - fit_cs_1_x_sliced[3] + fit_cs_2_x_sliced[0] + fit_cs_2_x_sliced[3]
+    plot_fit_x_2_normed = testbeam_analysis.tools.analysis_utils.gauss_offset(x_gauss_x, *fit_cs_2_x_sliced)
+    plot_fit_y_1_normed = testbeam_analysis.tools.analysis_utils.gauss_offset(x_gauss_y, *fit_cs_1_y_sliced) - fit_cs_1_y_sliced[3] + fit_cs_2_y_sliced[0] + fit_cs_2_y_sliced[3]
+    plot_fit_y_2_normed = testbeam_analysis.tools.analysis_utils.gauss_offset(x_gauss_y, *fit_cs_2_y_sliced)
+
+    # plot in pixel hit distribution and projections on top of axes and the respective fits
+    axHistx.bar(bin_center_x, x_intersections_hist_cs_1, width=np.mean(np.diff(bins[0])), color=plot_color_1)
+    axHistx.bar(bin_center_x, x_intersections_hist_cs_2, width=np.mean(np.diff(bins[0])), color=plot_color_2)
+    axHisty.barh(bin_center_y, y_intersections_hist_cs_1, height=np.mean(np.diff(bins[1])), color=plot_color_1)
+    axHisty.barh(bin_center_y, y_intersections_hist_cs_2, height=np.mean(np.diff(bins[1])), color=plot_color_2)
+    axHistx.plot(x_gauss_x,
+                 plot_fit_x_1_normed,
+                 color=mpl.colors.to_hex(cmap(1.), keep_alpha=True),
+                 label='Cluster Size 1 Hit Distribution')
+    axHistx.plot(x_gauss_x,
+                 plot_fit_x_2_normed,
+                 color=mpl.colors.to_hex(cmap(0.), keep_alpha=True),
+                 label='Cluster Size 2 Hit Distribution')
+    axHisty.plot(plot_fit_y_1_normed,
+                 x_gauss_y,
+                 color=mpl.colors.to_hex(cmap(1.), keep_alpha=True),
+                 label='Cluster Size 1 Hit Distribution')
+    axHisty.plot(plot_fit_y_2_normed,
+                 x_gauss_y,
+                 color=mpl.colors.to_hex(cmap(0.), keep_alpha=True),
+                 label='Cluster Size 2 Hit Distribution')
+    heatmap_cs = axHeatmap.imshow(intersections_2d_hist.T, origin='lower', interpolation='none', aspect="auto", extent=[0.0, bins[0][-1], 0.0, bins[1][-1]], cmap=cmap, norm=MidpointNormalize(midpoint=0., vmin=np.min(intersections_2d_hist), vmax=np.max(intersections_2d_hist)))
+
+    # calculate intersections
+    def difference_x_sliced(x):
+        return testbeam_analysis.tools.analysis_utils.gauss_offset(x, *fit_cs_1_x_sliced) - fit_cs_1_x_sliced[3] + fit_cs_2_x_sliced[0] + fit_cs_2_x_sliced[3] - testbeam_analysis.tools.analysis_utils.gauss_offset(x, *fit_cs_2_x_sliced)
+
+    def difference_y_sliced(x):
+        return testbeam_analysis.tools.analysis_utils.gauss_offset(x, *fit_cs_1_y_sliced) - fit_cs_1_y_sliced[3] + fit_cs_2_y_sliced[0] + fit_cs_2_y_sliced[3] - testbeam_analysis.tools.analysis_utils.gauss_offset(x, *fit_cs_2_y_sliced)
+
+    roots_x_sliced = fsolve(difference_x_sliced, [(pixel_pitch[0] - effective_pitch) / 2.0, pixel_pitch[0] - ((pixel_pitch[0] - effective_pitch) / 2.0)])
+    roots_y_sliced = fsolve(difference_y_sliced, [(pixel_pitch[1] - effective_pitch) / 2.0, pixel_pitch[1] - ((pixel_pitch[1] - effective_pitch) / 2.0)])
+
+    # draw intersections of CS 1 and CS 2 distribution
+    for i in range(len(roots_x_sliced)):
+        axHistx.axvline(roots_x_sliced[i], linestyle='--', color='dimgrey', label='Intersections' if i == 0 else None)
+        axHisty.axhline(roots_y_sliced[i], linestyle='--', color='dimgrey', label='Intersections' if i == 0 else None)
+    # draw effective cluster size area from overlap of CS1 and CS2
+    axHeatmap.plot([roots_x_sliced[0], roots_x_sliced[0], roots_x_sliced[1], roots_x_sliced[1], roots_x_sliced[0]],
+                   [roots_y_sliced[0], roots_y_sliced[1], roots_y_sliced[1], roots_y_sliced[0], roots_y_sliced[0]],
+                   '-', color='black', label='Effective CS-1-Pitch from Transition of Cluster Size Hit Distributions')
+    # draw effective cluster size area from cluster size ratio
+    axHeatmap.plot([(pixel_pitch[0] - effective_pitch) / 2., (pixel_pitch[0] - effective_pitch) / 2., pixel_pitch[0] - ((pixel_pitch[0] - effective_pitch) / 2.), pixel_pitch[0] - ((pixel_pitch[0] - effective_pitch) / 2.), (pixel_pitch[0] - effective_pitch) / 2.],
+                   [(pixel_pitch[1] - effective_pitch) / 2., pixel_pitch[1] - ((pixel_pitch[1] - effective_pitch) / 2.), pixel_pitch[1] - ((pixel_pitch[1] - effective_pitch) / 2.), (pixel_pitch[1] - effective_pitch) / 2., (pixel_pitch[1] - effective_pitch) / 2],
+                   '--', color='black', label='Effective CS-1-Pitch from Cluster Size Ratio of Cluster Size Distribution')
+
+    # colorbar
+    cbar = fig.colorbar(heatmap_cs, ax=axHisty)
+    cbar.ax.tick_params(labelsize=14)
+
+    # adjust plot limits
+    axHistx.set_xlim(0., pixel_pitch[0])
+    axHisty.set_ylim(0., pixel_pitch[1])
+    axHistx.set_ylim(bottom=0.8 * x_intersections_hist_cs_2.min())
+    axHisty.set_xlim(left=0.8 * y_intersections_hist_cs_2.min())
+    # set legend
+    axHeatmap.legend(loc='upper right')
+
+    output_pdf.savefig(fig)

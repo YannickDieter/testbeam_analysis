@@ -1299,3 +1299,273 @@ def histogram_track_angle(input_tracks_file, input_alignment_file=None, output_t
 
     if plot:
         plot_utils.plot_track_angle(input_track_angle_file=output_track_angle_file, output_pdf_file=None, dut_names=dut_names)
+
+
+def calculate_in_pixel_hit_distribution(input_tracks_file, input_alignment_file, use_duts, pixel_size, n_bins, output_pdf_file=None, plot=True, force_prealignment=False, output_in_pixel_dist_file=None, chunk_size=1000000):
+    '''Takes the tracks and calculates in-pixel-hit-distributions for cluster sizes between 1 and 4, additionally the effective CS-1-Pitch is calculated.
+    The effective CS-1-pitch 'p_eff' gives the area of one pixel in which CS1 is formed depending on the sensor threshold. It can be used to estimate the 
+    intrinsic resolution: sigma_int = p_eff / sqrt(12)
+
+    Parameters
+    ----------
+    input_tracks_file : string
+        Filename of the input tracks file.
+    input_alignment_file : string
+        Filename of the input alignment file.
+    use_duts : iterable
+        Calculate in-pixel-hit-distribution for selected DUTs. If None, all duts are selected.
+    pixel_size : iterable of tuples
+        One tuple per DUT describing the pixel dimension in um in column, row direction
+        e.g. for 2 DUTs: pixel_size = [(250, 50), (250, 50)]
+    n_bins : iterable
+        Number of bins for the histogram in x and y direction.
+    output_in_pixel_dist_file : string
+        Filename of the output in-pixel-hit-distribution file.
+    plot : bool
+        If True, create output plots. If false, only effective CS-1-Pitch will be calculated
+    force_prealignment : boolean
+        Take the prealignment, although if a coarse alignment is availale.
+    chunk_size : uint
+        Chunk size of the data when reading from file.
+    '''
+    logging.info('=== Calculating In-Pixel-Hit-Distribution for CS 1 - 4 ===')
+
+    use_prealignment = True if force_prealignment else False
+
+    def calculate_effective_cs1_pitch(cs_hist, pitch):
+        '''Calculates the effectice CS-1 pitch p_eff using the CS distribution: p_eff = sqrt(pitch^2 * CS1_percentage)
+        '''
+        perc_cluster_size_1 = 100. * ((cs_hist[0].astype(np.float) / np.sum(cs_hist).astype(np.float)))
+        return np.sqrt(pitch * pitch * perc_cluster_size_1 / 100.)
+
+    def normalize_distributions(hists, fit_results):
+        '''Normalize CS distributions in order to compare them.
+        '''
+        hist_normed = [hists[0] - fit_results[0][3] + fit_results[2][0] + fit_results[2][3],  # shift CS 1 distribution (x-axis projection) such that backgrounds of CS 2 and CS 1 is the same
+                       hists[1],  # CS 2 distribution (x-axis projection) stays the same
+                       hists[2] - fit_results[1][3] + fit_results[3][0] + fit_results[3][3],  # shift CS 1 distribution (y-axis projection) such that backgrounds of CS 2 and CS 1 is the same
+                       hists[3]]  # CS 2 distribution (y-axis projection) stays the same
+        return hist_normed
+
+    # read alignment for converting the track intersections with the respective dut (global reference system) to local track intersections
+    with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+        if use_prealignment:
+            logging.info('Use pre-alignment data')
+            prealignment = in_file_h5.root.PreAlignment[:]
+            n_duts = prealignment.shape[0]
+        else:
+            logging.info('Use alignment data')
+            alignment = in_file_h5.root.Alignment[:]
+            n_duts = alignment.shape[0]
+
+    use_duts = use_duts if use_duts is not None else range(n_duts)  # standard setting: fit tracks for all DUTs
+
+    if plot:
+        output_pdf = PdfPages(output_pdf_file + '.pdf')
+    else:
+        output_pdf = None
+
+    n_bins = [n_bins, n_bins] if not isinstance(n_bins, Iterable) else n_bins
+
+    effective_pitches = []
+
+    with tb.open_file(input_tracks_file, 'r') as in_file_h5:
+        for actual_dut in use_duts:
+            node = in_file_h5.get_node(in_file_h5.root, 'Tracks_DUT_%d' % actual_dut)
+
+            actual_pixel_size = pixel_size[actual_dut]
+
+            initialize = True
+            for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):  # read track file in chunks
+                print tracks_chunk.dtype
+                # select only valid track intersection
+                tracks_chunk = tracks_chunk[~np.isnan(tracks_chunk[:]['offset_0'])]
+
+                # select different CS in order to histogram them and to deduce from the CS ratio the effective CS-1-pitch
+                n_hits = tracks_chunk[~np.isnan(tracks_chunk['n_hits_dut_%d' % actual_dut])]['n_hits_dut_%d' % actual_dut]
+
+                # read track intersections wiht actual dut for cluster sizes betwenn 1 and 4
+                intersection_x, intersection_y, intersection_z = tracks_chunk[:]['offset_0'], tracks_chunk[:]['offset_1'], tracks_chunk[:]['offset_2']
+                intersection_x_cs_1 = intersection_x[np.where(tracks_chunk[:]['n_hits_dut_%i' % actual_dut] == 1)]
+                intersection_y_cs_1 = intersection_y[np.where(tracks_chunk[:]['n_hits_dut_%i' % actual_dut] == 1)]
+                intersection_z_cs_1 = intersection_z[np.where(tracks_chunk[:]['n_hits_dut_%i' % actual_dut] == 1)]
+                intersection_x_cs_2 = intersection_x[np.where(tracks_chunk[:]['n_hits_dut_%i' % actual_dut] == 2)]
+                intersection_y_cs_2 = intersection_y[np.where(tracks_chunk[:]['n_hits_dut_%i' % actual_dut] == 2)]
+                intersection_z_cs_2 = intersection_z[np.where(tracks_chunk[:]['n_hits_dut_%i' % actual_dut] == 2)]
+                intersection_x_cs_3 = intersection_x[np.where(tracks_chunk[:]['n_hits_dut_%i' % actual_dut] == 3)]
+                intersection_y_cs_3 = intersection_y[np.where(tracks_chunk[:]['n_hits_dut_%i' % actual_dut] == 3)]
+                intersection_z_cs_3 = intersection_z[np.where(tracks_chunk[:]['n_hits_dut_%i' % actual_dut] == 3)]
+                intersection_x_cs_4 = intersection_x[np.where(tracks_chunk[:]['n_hits_dut_%i' % actual_dut] == 4)]
+                intersection_y_cs_4 = intersection_y[np.where(tracks_chunk[:]['n_hits_dut_%i' % actual_dut] == 4)]
+                intersection_z_cs_4 = intersection_z[np.where(tracks_chunk[:]['n_hits_dut_%i' % actual_dut] == 4)]
+
+                # transoform to local coordinate system
+                if use_prealignment:
+                    intersection_x_cs_1_local, intersection_y_cs_1_local, intersection_z_cs_1_local = geometry_utils.apply_alignment(intersection_x_cs_1, intersection_y_cs_1, intersection_z_cs_1,
+                                                                                                                                     dut_index=actual_dut,
+                                                                                                                                     prealignment=prealignment,
+                                                                                                                                     inverse=True)
+
+                    intersection_x_cs_2_local, intersection_y_cs_2_local, intersection_z_cs_2_local = geometry_utils.apply_alignment(intersection_x_cs_2, intersection_y_cs_2, intersection_z_cs_2,
+                                                                                                                                     dut_index=actual_dut,
+                                                                                                                                     prealignment=prealignment,
+                                                                                                                                     inverse=True)
+
+                    intersection_x_cs_3_local, intersection_y_cs_3_local, intersection_z_cs_3_local = geometry_utils.apply_alignment(intersection_x_cs_3, intersection_y_cs_3, intersection_z_cs_3,
+                                                                                                                                     dut_index=actual_dut,
+                                                                                                                                     prealignment=prealignment,
+                                                                                                                                     inverse=True)
+
+                    intersection_x_cs_4_local, intersection_y_cs_4_local, intersection_z_cs_4_local = geometry_utils.apply_alignment(intersection_x_cs_4, intersection_y_cs_4, intersection_z_cs_4,
+                                                                                                                                     dut_index=actual_dut,
+                                                                                                                                     prealignment=prealignment,
+                                                                                                                                     inverse=True)
+
+                else:
+                    intersection_x_cs_1_local, intersection_y_cs_1_local, intersection_z_cs_1_local = geometry_utils.apply_alignment(intersection_x_cs_1, intersection_y_cs_1, intersection_z_cs_1,
+                                                                                                                                     dut_index=actual_dut,
+                                                                                                                                     alignment=alignment,
+                                                                                                                                     inverse=True)
+
+                    intersection_x_cs_2_local, intersection_y_cs_2_local, intersection_z_cs_2_local = geometry_utils.apply_alignment(intersection_x_cs_2, intersection_y_cs_2, intersection_z_cs_2,
+                                                                                                                                     dut_index=actual_dut,
+                                                                                                                                     alignment=alignment,
+                                                                                                                                     inverse=True)
+
+                    intersection_x_cs_3_local, intersection_y_cs_3_local, intersection_z_cs_3_local = geometry_utils.apply_alignment(intersection_x_cs_3, intersection_y_cs_3, intersection_z_cs_3,
+                                                                                                                                     dut_index=actual_dut,
+                                                                                                                                     alignment=alignment,
+                                                                                                                                     inverse=True)
+
+                    intersection_x_cs_4_local, intersection_y_cs_4_local, intersection_z_cs_4_local = geometry_utils.apply_alignment(intersection_x_cs_4, intersection_y_cs_4, intersection_z_cs_4,
+                                                                                                                                     dut_index=actual_dut,
+                                                                                                                                     alignment=alignment,
+                                                                                                                                     inverse=True)
+
+                if not np.allclose(intersection_z_cs_4_local[np.isfinite(intersection_z_cs_4_local)], 0.0):
+                    print intersection_z_cs_4_local
+                    raise RuntimeError("Transformation into local coordinate system gives z != 0")
+
+                # project track intersections onto one pixel in order to increase statistics
+                projection_x_1 = np.mod(intersection_x_cs_1_local, np.array([actual_pixel_size[0]] * len(intersection_x_cs_1_local)))
+                projection_y_1 = np.mod(intersection_y_cs_1_local, np.array([actual_pixel_size[1]] * len(intersection_y_cs_1_local)))
+                projection_x_2 = np.mod(intersection_x_cs_2_local, np.array([actual_pixel_size[0]] * len(intersection_x_cs_2_local)))
+                projection_y_2 = np.mod(intersection_y_cs_2_local, np.array([actual_pixel_size[1]] * len(intersection_y_cs_2_local)))
+                projection_x_3 = np.mod(intersection_x_cs_3_local, np.array([actual_pixel_size[0]] * len(intersection_x_cs_3_local)))
+                projection_y_3 = np.mod(intersection_y_cs_3_local, np.array([actual_pixel_size[1]] * len(intersection_y_cs_3_local)))
+                projection_x_4 = np.mod(intersection_x_cs_4_local, np.array([actual_pixel_size[0]] * len(intersection_x_cs_4_local)))
+                projection_y_4 = np.mod(intersection_y_cs_4_local, np.array([actual_pixel_size[1]] * len(intersection_y_cs_4_local)))
+
+                # histogram intersections and CS (for calculation of effective pitch)
+                if initialize:
+                    projection_x_1_hist, edges_x = np.histogram(projection_x_1, bins=n_bins[0], range=[0.0, actual_pixel_size[0]])
+                    projection_y_1_hist, edges_y = np.histogram(projection_y_1, bins=n_bins[1], range=[0.0, actual_pixel_size[1]])
+                    projection_x_2_hist, _ = np.histogram(projection_x_2, bins=n_bins[0], range=[0.0, actual_pixel_size[0]])
+                    projection_y_2_hist, _ = np.histogram(projection_y_2, bins=n_bins[1], range=[0.0, actual_pixel_size[1]])
+                    projection_x_3_hist, _ = np.histogram(projection_x_3, bins=n_bins[0], range=[0.0, actual_pixel_size[0]])
+                    projection_y_3_hist, _ = np.histogram(projection_y_3, bins=n_bins[1], range=[0.0, actual_pixel_size[1]])
+                    projection_x_4_hist, _ = np.histogram(projection_x_4, bins=n_bins[0], range=[0.0, actual_pixel_size[0]])
+                    projection_y_4_hist, _ = np.histogram(projection_y_4, bins=n_bins[1], range=[0.0, actual_pixel_size[1]])
+
+                    projection_1_2d_hist, _, _ = np.histogram2d(x=projection_x_1, y=projection_y_1, bins=[edges_x, edges_y])
+                    projection_2_2d_hist, _, _ = np.histogram2d(x=projection_x_2, y=projection_y_2, bins=[edges_x, edges_y])
+                    projection_3_2d_hist, _, _ = np.histogram2d(x=projection_x_3, y=projection_y_3, bins=[edges_x, edges_y])
+                    projection_4_2d_hist, _, _ = np.histogram2d(x=projection_x_4, y=projection_y_4, bins=[edges_x, edges_y])
+
+                    cs_edges = np.arange(1.0 - 0.5, 1000 + 0.5, 1)
+                    cs_hist, cs_edges = np.histogram(n_hits, bins=cs_edges, density=False)
+                    initialize = False
+                else:  # if already read first chunk, add histograms up
+                    projection_x_1_hist += np.histogram(projection_x_1, bins=edges_x)[0]
+                    projection_y_1_hist += np.histogram(projection_y_1, bins=edges_y)[0]
+                    projection_x_2_hist += np.histogram(projection_x_2, bins=edges_x)[0]
+                    projection_y_2_hist += np.histogram(projection_y_2, bins=edges_y)[0]
+                    projection_x_3_hist += np.histogram(projection_x_3, bins=edges_x)[0]
+                    projection_y_3_hist += np.histogram(projection_y_3, bins=edges_y)[0]
+                    projection_x_4_hist += np.histogram(projection_x_4, bins=edges_x)[0]
+                    projection_y_4_hist += np.histogram(projection_y_4, bins=edges_y)[0]
+
+                    projection_1_2d_hist += np.histogram2d(x=projection_x_1, y=projection_y_1, bins=[edges_x, edges_y])[0]
+                    projection_2_2d_hist += np.histogram2d(x=projection_x_2, y=projection_y_2, bins=[edges_x, edges_y])[0]
+                    projection_3_2d_hist += np.histogram2d(x=projection_x_3, y=projection_y_3, bins=[edges_x, edges_y])[0]
+                    projection_4_2d_hist += np.histogram2d(x=projection_x_4, y=projection_y_4, bins=[edges_x, edges_y])[0]
+
+                    cs_hist += np.histogram(n_hits, bins=cs_edges, density=False)[0]
+
+            # calculate effective pitch from cluster size ratio
+            effective_pitch = calculate_effective_cs1_pitch(cs_hist=cs_hist, pitch=actual_pixel_size[0])
+            effective_pitches.append(effective_pitch)
+
+            if plot:
+                # plot histograms for cluster sizes between 1 and 4
+                plot_utils.plot_in_pixel_hit_hist(x_intersections_hist=projection_x_1_hist,
+                                                  y_intersections_hist=projection_y_1_hist,
+                                                  intersections_2d_hist=projection_1_2d_hist,
+                                                  pixel_pitch=actual_pixel_size,
+                                                  output_pdf=output_pdf,
+                                                  bins=[edges_x, edges_y],
+                                                  plot_title=('In-pixel Cluster Size 1 Hit Distribution for DUT%d' % actual_dut))
+                plot_utils.plot_in_pixel_hit_hist(x_intersections_hist=projection_x_2_hist,
+                                                  y_intersections_hist=projection_y_2_hist,
+                                                  intersections_2d_hist=projection_2_2d_hist,
+                                                  pixel_pitch=actual_pixel_size,
+                                                  output_pdf=output_pdf,
+                                                  bins=[edges_x, edges_y],
+                                                  plot_title=('In-pixel Cluster Size 2 Hit Distribution for DUT%d' % actual_dut))
+                plot_utils.plot_in_pixel_hit_hist(x_intersections_hist=projection_x_3_hist,
+                                                  y_intersections_hist=projection_y_3_hist,
+                                                  intersections_2d_hist=projection_3_2d_hist,
+                                                  pixel_pitch=actual_pixel_size,
+                                                  output_pdf=output_pdf,
+                                                  bins=[edges_x, edges_y],
+                                                  plot_title=('In-pixel Cluster Size 3 Hit Distribution for DUT%d' % actual_dut))
+                plot_utils.plot_in_pixel_hit_hist(x_intersections_hist=projection_x_4_hist,
+                                                  y_intersections_hist=projection_y_4_hist,
+                                                  intersections_2d_hist=projection_4_2d_hist,
+                                                  pixel_pitch=actual_pixel_size,
+                                                  output_pdf=output_pdf,
+                                                  bins=[edges_x, edges_y],
+                                                  plot_title=('In-pixel Cluster Size 4 Hit Distribution for DUT%d' % actual_dut))
+
+            # take slice out of middle
+            slice_width = 5  # set withd of slice to 5 um
+            slice_start_x = (actual_pixel_size[0] - slice_width) / 2.0
+            slice_stop_x = (actual_pixel_size[0] + slice_width) / 2.0
+            slice_start_y = (actual_pixel_size[1] - slice_width) / 2.0
+            slice_stop_y = (actual_pixel_size[1] + slice_width) / 2.0
+            start_x = int(slice_start_x / (actual_pixel_size[0] / n_bins[0]))
+            stop_x = int(slice_stop_x / (actual_pixel_size[0] / n_bins[0]))
+            start_y = int(slice_start_y / (actual_pixel_size[0] / n_bins[1]))
+            stop_y = int(slice_stop_y / (actual_pixel_size[0] / n_bins[1]))
+            sliced_hist_y_1 = np.sum(projection_1_2d_hist[start_x:stop_x, ], axis=0)
+            sliced_hist_x_1 = np.sum(projection_1_2d_hist[:, start_y:stop_y], axis=1)
+            sliced_hist_y_2 = np.sum(projection_2_2d_hist[start_x:stop_x, ], axis=0)
+            sliced_hist_x_2 = np.sum(projection_2_2d_hist[:, start_y:stop_y], axis=1)
+
+            # fit projections onto x and y-axis of CS 1 and CS 2 distributions
+            fit_cs_1_x_sliced, fit_cs_1_y_sliced, fit_cs_2_x_sliced, fit_cs_2_y_sliced = analysis_utils.fit_in_pixel_hit_hist(cs1_hist_projected=[sliced_hist_x_1, sliced_hist_y_1],
+                                                                                                                              cs2_hist_projected=[sliced_hist_x_2, sliced_hist_y_2], 
+                                                                                                                              bin_center_x=(edges_x[1:] + edges_x[:-1]) / 2.0,
+                                                                                                                              bin_center_y=(edges_y[1:] + edges_y[:-1]) / 2.0)
+
+            # deduce normalization (shift) from fit, norm such that background of CS 1 distribution is the same as background of CS 2 distribution
+            x_intersections_hist_cs_1_normed, x_intersections_hist_cs_2_normed, y_intersections_hist_cs_1_normed, y_intersections_hist_cs_2_normed = normalize_distributions(hists=[sliced_hist_x_1, sliced_hist_x_2, sliced_hist_y_1, sliced_hist_y_2],
+                                                                                                                                                                             fit_results=[fit_cs_1_x_sliced, fit_cs_1_y_sliced, fit_cs_2_x_sliced, fit_cs_2_y_sliced])
+            if plot:
+                # plot effective CS-1 pitch  from ratio of CS distribution
+                plot_utils.plot_in_pixel_hit_hist_with_eff_pitch(x_intersections_hist_cs_1=x_intersections_hist_cs_1_normed,
+                                                                 x_intersections_hist_cs_2=x_intersections_hist_cs_2_normed,
+                                                                 y_intersections_hist_cs_1=y_intersections_hist_cs_1_normed,
+                                                                 y_intersections_hist_cs_2=y_intersections_hist_cs_2_normed,
+                                                                 intersections_2d_hist=projection_1_2d_hist - projection_2_2d_hist,
+                                                                 fit_results=[fit_cs_1_x_sliced, fit_cs_1_y_sliced, fit_cs_2_x_sliced, fit_cs_2_y_sliced],
+                                                                 pixel_pitch=actual_pixel_size,
+                                                                 bins=[edges_x, edges_y],
+                                                                 effective_pitch=effective_pitch,
+                                                                 output_pdf=output_pdf,
+                                                                 plot_title=('Effective Cluster Size 1 Pitch for DUT%d' % actual_dut))
+
+    if output_pdf is not None:
+        output_pdf.close()
+
+    return effective_pitches
