@@ -53,8 +53,8 @@ def check_file(input_hits_file, n_pixel, output_check_file=None,
         with tb.open_file(input_hits_file, 'r') as input_file_h5:
             shape_column = (n_pixel[0], n_pixel[0])
             shape_row = (n_pixel[1], n_pixel[1])
-            col_corr = np.zeros(shape_column, dtype=np.int)
-            row_corr = np.zeros(shape_row, dtype=np.int)
+            col_corr = np.zeros(shape_column, dtype=np.int32)
+            row_corr = np.zeros(shape_row, dtype=np.int32)
             last_event = None
             out_dE = out_file_h5.create_earray(out_file_h5.root, name='EventDelta',
                                                title='Change of event number per non empty event',

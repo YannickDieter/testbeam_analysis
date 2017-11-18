@@ -279,7 +279,7 @@ class TestHitAnalysis(unittest.TestCase):
                     in_file_h5.root.Hits[:]['row'] - 1) * self.simulate_data.dut_pixel_size[1][1]
 
             # Calculate theta in spherical coordinates from data
-            dx = dut1_x.astype(np.float) - dut0_x.astype(np.int)
+            dx = dut1_x.astype(np.float) - dut0_x.astype(np.int32)
             dy = dut1_y.astype(np.float) - dut0_y.astype(np.float)
             dz = np.ones_like(
                 dx) * (self.simulate_data.z_positions[1] - self.simulate_data.z_positions[0])

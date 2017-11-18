@@ -63,8 +63,8 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
         for dut_index in range(1, n_duts):
             shape_column = (n_pixels[dut_index][0], n_pixels[0][0])
             shape_row = (n_pixels[dut_index][1], n_pixels[0][1])
-            column_correlations.append(np.zeros(shape_column, dtype=np.int))
-            row_correlations.append(np.zeros(shape_row, dtype=np.int))
+            column_correlations.append(np.zeros(shape_column, dtype=np.int32))
+            row_correlations.append(np.zeros(shape_row, dtype=np.int32))
 
         start_indices = [None] * n_duts  # Store the loop indices for speed up
 
@@ -342,8 +342,8 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
             if reduce_background:
                 uu, dd, vv = np.linalg.svd(data)  # sigular value decomposition
                 background = np.matrix(uu[:, :1]) * np.diag(dd[:1]) * np.matrix(vv[:1, :])  # take first sigular value for background
-                background = np.array(background, dtype=np.int)  # make Numpy array
-                data = (data - background).astype(np.int)  # remove background
+                background = np.array(background, dtype=np.int32)  # make Numpy array
+                data = (data - background).astype(np.int32)  # remove background
                 data -= data.min()  # only positive values
 
             if no_fit:
@@ -456,10 +456,10 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 result[dut_idx][table_prefix + '_sigma'], result[dut_idx][table_prefix + '_sigma_error'] = mean_sigma, mean_sigma_error
 
                 # Calculate the index of the beam center based on valid indices
-                plot_index = np.average(x_selected - 1, weights=np.sum(data, axis=1)[np.array(x_selected - 1, dtype=np.int)])
+                plot_index = np.average(x_selected - 1, weights=np.sum(data, axis=1)[np.array(x_selected - 1, dtype=np.int32)])
                 # Find nearest valid index to the calculated index
                 idx = (np.abs(x_selected - 1 - plot_index)).argmin()
-                plot_index = np.array(x_selected - 1, dtype=np.int)[idx]
+                plot_index = np.array(x_selected - 1, dtype=np.int32)[idx]
 
                 x_fit = np.linspace(start=x_ref.min(), stop=x_ref.max(), num=500, endpoint=True)
                 indices_lower = np.arange(plot_index)
@@ -1209,7 +1209,7 @@ def _calculate_translation_alignment(track_candidates_file, alignment_file, fit_
 # Helper functions for the alignment. Not to be used directly.
 def _create_alignment_array(n_duts):
     # Result Translation / rotation table
-    description = [('DUT', np.int)]
+    description = [('DUT', np.int32)]
     description.append(('translation_x', np.float))
     description.append(('translation_y', np.float))
     description.append(('translation_z', np.float))
