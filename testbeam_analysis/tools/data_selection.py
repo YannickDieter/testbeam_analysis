@@ -24,9 +24,9 @@ def combine_hit_files(hit_files, combined_file, event_number_offsets=None,
     Parameters
     ----------
     hit_files : iterable
-       Filenames of files containing the hit array.
+        Filenames of files containing the hit array.
     combined_file : string
-       Filename of the output file containing the combined hit array.
+        Filename of the output file containing the combined hit array.
     event_number_offsets : iterable
         Manually set start event number offset for each hit array.
         The event number is increased by the given number.
@@ -80,7 +80,7 @@ def reduce_hit_files(hit_files, fraction=10, chunk_size=1000000):
     Parameters
     ----------
     hit_files : iterable
-       Filenames of files containing the hit array.
+        Filenames of files containing the hit array.
     fraction : uint
         The fraction of leftover events,
         e.g.: 10 would correspond to n_events = total_events / fraction.

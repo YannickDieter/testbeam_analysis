@@ -290,7 +290,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
             fit_background = False
 
     if plot is True and not gui:
-        output_pdf = PdfPages(os.path.splitext(output_alignment_file)[0] + '_prealigned.pdf')
+        output_pdf = PdfPages(os.path.splitext(output_alignment_file)[0] + '_prealigned.pdf', keep_empty=False)
     else:
         output_pdf = None
 
@@ -708,7 +708,7 @@ def apply_alignment(input_hit_file, input_alignment_file, output_hit_file, inver
         Filename of the input alignment file.
     output_hit_file : string
         Filename of the output hits file with hit data after alignment was applied.
-    inverse : boolean
+    inverse : bool
         If True, apply the inverse alignment.
     force_prealignment : bool
         If True, use pre-alignment, even if alignment data is availale.
@@ -1077,7 +1077,7 @@ def _duts_alignment(track_candidates_file, alignment_file, alignment_index, alig
     # Plot final result
     if plot:
         logging.info('= Alignment step 7: Plot final result =')
-        with PdfPages(os.path.join(os.path.dirname(os.path.realpath(track_candidates_file)), 'Alignment_%d.pdf' % alignment_index)) as output_pdf:
+        with PdfPages(os.path.join(os.path.dirname(os.path.realpath(track_candidates_file)), 'Alignment_%d.pdf' % alignment_index), keep_empty=False) as output_pdf:
             # Apply final alignment result
             apply_alignment(input_hit_file=os.path.splitext(track_candidates_reduced)[0] + '_not_aligned.h5',
                             input_alignment_file=alignment_file,

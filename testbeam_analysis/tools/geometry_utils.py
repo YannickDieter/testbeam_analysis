@@ -17,9 +17,9 @@ def get_plane_normal(direction_vector_1, direction_vector_2):
     Parameters
     ----------
     direction_vector_1 : array
-       Array with x, y and z.
+        Array with x, y and z.
     direction_vector_2 : array
-       Array with x, y and z.
+        Array with x, y and z.
 
     Returns
     -------

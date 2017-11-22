@@ -57,11 +57,11 @@ class SMC(object):
                 Name/Filters/Title values are deduced from the input table
                 if not defined. Data type is deduced from resulting data
                 format if not defined.
-                
+
                 Example:
                 node_desc = {'name': test}
                 Would create an output node with the name test, the title and
-                filters as the input table and the data type is deduced from 
+                filters as the input table and the data type is deduced from
                 the calculated data.
             table : string, iterable of strings, None
                 string: Table name. Needed if multiple tables exists in file.
@@ -297,7 +297,7 @@ class SMC(object):
         else:  # TODO: solution without having all hists in RAM
             # Only one file, merging not needed
             if len(self.tmp_files) == 1:
-                shutil.move(self.tmp_files[0], self.file_out)   
+                shutil.move(self.tmp_files[0], self.file_out)
             else:  # Several files, merge them by adding up
                 with tb.open_file(self.file_out, 'w') as out_file:
                     hist_data = None
@@ -316,14 +316,14 @@ class SMC(object):
                                         shape.append(tmp_data.shape[i])
                                     else:
                                         shape.append(hist_data.shape[i])
-        
+
                                 hist_data.resize(shape)
-        
+
                                 # Add array, ignore size
                                 tmp_data.resize(hist_data.shape)
                                 hist_data += tmp_data
                         os.remove(f)
-    
+
                     dt = hist_data.dtype
                     out = out_file.create_carray(out_file.root,
                                                  atom=tb.Atom.from_dtype(dt),

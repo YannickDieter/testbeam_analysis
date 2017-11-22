@@ -4,6 +4,7 @@ FE-I4:
   n_rows: 336
   pitch_col: 250.0
   pitch_row: 50.0
+
 Mimosa26:
   material_budget: 0.000797512
   n_cols: 1152

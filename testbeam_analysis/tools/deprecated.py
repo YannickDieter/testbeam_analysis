@@ -78,7 +78,7 @@ def check_hit_alignment(input_tracklets_file, output_pdf_file, combine_n_hits=10
     '''
     logging.info('=== Check hit alignment ===')
     with tb.open_file(input_tracklets_file, mode="r") as in_file_h5:
-        with PdfPages(output_pdf_file) as output_pdf:
+        with PdfPages(output_pdf_file, keep_empty=False) as output_pdf:
             for table_column in in_file_h5.root.Tracklets.dtype.names:
                 if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
                     median, mean, std, alignment, correlation = [], [], [], [], []
@@ -197,7 +197,7 @@ def fix_event_alignment(input_tracklets_file, tracklets_corr_file, input_alignme
             correction_out.append(particles_corrected)
 
 
-def align_z(input_track_candidates_file, input_alignment_file, output_pdf, z_positions=None, track_quality=1, max_tracks=3, warn_at=0.5):
+def align_z(input_track_candidates_file, input_alignment_file, output_pdf_file, z_positions=None, track_quality=1, max_tracks=3, warn_at=0.5):
     '''Minimizes the squared distance between track hit and measured hit by changing the z position.
     In a perfect measurement the function should be minimal at the real DUT position. The tracks is given
     by the first and last reference hit. A track quality cut is applied to all cuts first.
@@ -206,7 +206,7 @@ def align_z(input_track_candidates_file, input_alignment_file, output_pdf, z_pos
     ----------
     input_track_candidates_file : pytables file
     input_alignment_file : pytables file
-    output_pdf : pdf file name object
+    output_pdf_file : pdf file name object
     track_quality : int
         0: All tracks with hits in DUT and references are taken
         1: The track hits in DUT and reference are within 5-sigma of the correlation
@@ -217,7 +217,7 @@ def align_z(input_track_candidates_file, input_alignment_file, output_pdf, z_pos
     def pos_error(z, dut, first_reference, last_reference):
         return np.mean(np.square(z * (last_reference - first_reference) + first_reference - dut))
 
-    with PdfPages(output_pdf) as output_pdf:
+    with PdfPages(output_pdf_file, keep_empty=False) as output_pdf:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
             track_candidates = in_file_h5.root.TrackCandidates[::10]  # take only every 10th track
@@ -314,7 +314,7 @@ def optimize_track_alignment(input_track_candidates_file, input_alignment_file, 
         corrected_trackcandidates_table.append(particles)
 
 
-def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000000, correlated_only=False, track_quality=None):
+def check_track_alignment(trackcandidates_files, output_pdf_file, combine_n_hits=1000000, correlated_only=False, track_quality=None):
     '''Takes the tracklet array and plots the difference of column/row position of each DUT against the reference DUT0
     for every combine_n_events. If the alignment worked the median has to be around 0 and should not change with time
     (with the event number).
@@ -324,7 +324,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
     ----------
     input_track_candidates_file : string
         Input file name with merged cluster hit table from all DUTs
-    output_pdf : pdf file name object
+    output_pdf_file : pdf file name object
     combine_n_hits : int
         The number of events to combine for the hit position check
     correlated_only : bool
@@ -338,7 +338,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
     '''
     logging.info('=== Check TrackCandidates Alignment ===')
     with tb.open_file(trackcandidates_files, mode="r") as in_file_h5:
-        with PdfPages(output_pdf) as output_pdf:
+        with PdfPages(output_pdf_file, keep_empty=False) as output_pdf:
             for table_column in in_file_h5.root.TrackCandidates.dtype.names:
                 if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
                     dut_index = int(table_column[-1])  # DUT index of actual DUT data
@@ -372,8 +372,8 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
                         progress_bar.update(index)
 
                     progress_bar.finish()
-                    
-def fit_tracks_kalman(input_track_candidates_file, output_tracks_file, geometry_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, method="Interpolation", pixel_size=[], chunk_size=1000000):
+
+def fit_tracks_kalman(input_track_candidates_file, output_tracks_file, geometry_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf_file=None, use_correlated=False, method="Interpolation", pixel_size=[], chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
@@ -402,7 +402,7 @@ def fit_tracks_kalman(input_track_candidates_file, output_tracks_file, geometry_
         E.g. 0000 0101 assigns hits in DUT0 and DUT2 to the corresponding track quality.
     pixel_size : iterable, (x dimensions, y dimension)
         the size in um of the pixels, needed for chi2 calculation
-    output_pdf : pdf file name object
+    output_pdf_file : pdf file name object
         if None plots are printed to screen
     correlated_only : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
@@ -489,7 +489,7 @@ def fit_tracks_kalman(input_track_candidates_file, output_tracks_file, geometry_
     if method == "kalman" and not pixel_size:
         raise ValueError('Kalman filter requires to provide pixel size for error measurement matrix covariance!')
 
-    with PdfPages(output_pdf) as output_pdf:
+    with PdfPages(output_pdf_file, keep_empty=False) as output_pdf:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             with tb.open_file(output_tracks_file, mode='w') as out_file_h5:
                 n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])

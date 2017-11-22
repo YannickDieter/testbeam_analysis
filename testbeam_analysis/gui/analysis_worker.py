@@ -30,7 +30,7 @@ class AnalysisWorker(QtCore.QObject):
         self.funcs_args = funcs_args
 
     def work(self):
-        """ 
+        """
         Runs the function func with given argument args. If funcs_args is not None, it contains
         functions and corresponding arguments which are looped over and run. If errors or exceptions
         occur, a signal sends the exception to main thread. Most recent traceback wil be dumped in yaml file.
