@@ -314,7 +314,7 @@ def optimize_track_alignment(input_track_candidates_file, input_alignment_file, 
         corrected_trackcandidates_table.append(particles)
 
 
-def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=10000000, correlated_only=False, track_quality=None):
+def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000000, correlated_only=False, track_quality=None):
     '''Takes the tracklet array and plots the difference of column/row position of each DUT against the reference DUT0
     for every combine_n_events. If the alignment worked the median has to be around 0 and should not change with time
     (with the event number).

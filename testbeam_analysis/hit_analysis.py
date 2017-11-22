@@ -122,7 +122,7 @@ def check_file(input_hits_file, n_pixel, output_check_file=None,
         plot_utils.plot_checks(input_corr_file=output_check_file)
 
 
-def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMask", output_mask_file=None, pixel_size=None, threshold=10.0, filter_size=3, dut_name=None, plot=True, chunk_size=10000000):
+def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMask", output_mask_file=None, pixel_size=None, threshold=10.0, filter_size=3, dut_name=None, plot=True, chunk_size=1000000):
     '''Generating pixel mask from the hit table.
 
     Parameters

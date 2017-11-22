@@ -375,7 +375,7 @@ class SMC(object):
         return next_indeces
 
     def _chunks_at_event(self, table, start_index=None, stop_index=None,
-                         chunk_size=10000000):
+                         chunk_size=1000000):
         '''Takes the table with a event_number column and returns chunks.
 
         The chunks are chosen in a way that the events are not splitted.
