@@ -18,7 +18,7 @@ def nan_to_num(array, copy=False):
     Parameters
     ----------
     array : numpy.ndarray
-    copy : boolean
+    copy : bool
         If True, return copy. If False, replace values in-place.
 
     Returns
@@ -92,7 +92,7 @@ def nan_close(first_array, second_array, rtol=1e-5, atol=1e-8, equal_nan=True):
     second_array : numpy.ndarray
     rtol : float
     atol : float
-    equal_nan : boolean
+    equal_nan : bool
         If True, NaNs are considered equal.
 
     Returns
@@ -201,9 +201,9 @@ def compare_h5_files(first_file, second_file, node_names=None, detailed_comparis
     node_names : list, tuple
         Iterable of node names that are required to exist and will be compared.
         If None, compare all existing nodes and fail if nodes are not existing.
-    detailed_comparison : boolean
+    detailed_comparison : bool
         Print reason why the comparison failed
-    exact : boolean
+    exact : bool
         True if the results have to match exactly. E.g. False for fit results.
     rtol, atol: number
         From numpy.allclose:

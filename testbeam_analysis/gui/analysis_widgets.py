@@ -29,7 +29,7 @@ def get_default_args(func):
 
 
 def get_parameter_doc(func, dtype=False):
-    """ 
+    """
     Returns a dictionary of paramerter:pardoc for the input function
     Pardoc is either the parameter description (dtype=False) or the data type (dtype=False)
     """
@@ -203,7 +203,7 @@ class AnalysisWidget(QtWidgets.QWidget):
             None are set as optional. The common behavior is that None deactivates a parameter
         default_value : object
             Default value for option
-        fixed : boolean
+        fixed : bool
             Fix option value  default value
         """
 
@@ -405,7 +405,7 @@ class AnalysisWidget(QtWidgets.QWidget):
             self.return_values = val
 
     def _call_funcs(self):
-        """ 
+        """
         Call all functions in a row
         """
 
@@ -446,7 +446,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         """
         Disconnects ok button from running analysis and connects to calling "ViTables".
 
-        :param files: HDF5-file or list of HDF5-files  
+        :param files: HDF5-file or list of HDF5-files
         """
 
         self.btn_ok.setDisabled(False)
@@ -665,7 +665,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
     def _call_parallel_funcs(self):
         """
-        Calls the respective call_funcs method of each of the AnalysisWidgets and disables all input widgets 
+        Calls the respective call_funcs method of each of the AnalysisWidgets and disables all input widgets
         """
 
         # Disable ok button and show progressbar
@@ -716,7 +716,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         """
         Disconnects ok button from running analysis and connects to calling "ViTables".
 
-        :param files: HDF5-file or list of HDF5-files  
+        :param files: HDF5-file or list of HDF5-files
         """
         self.btn_ok.setDisabled(False)
         self.btn_ok.setText('Open output file(s) via ViTables')

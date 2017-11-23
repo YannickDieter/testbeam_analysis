@@ -214,7 +214,7 @@ def plot_tracks_per_event(input_tracks_file, output_pdf_file=None, gui=False):
     chunk_size : int
         Chunk size of the data when reading from file.
     gui: bool
-        Whether or not to plot directly into gui 
+        Whether or not to plot directly into gui
     """
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_tracks_per_event.pdf'
@@ -308,7 +308,7 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
     mean_fitted : array like
         The fitted peaks of one column / row correlation
     mean_error_fitted : array like
-         The error of the fitted peaks of one column / row correlation
+        The error of the fitted peaks of one column / row correlation
     n_cluster : array like
         The number of hits per column / row
     ref_name : string
@@ -317,7 +317,7 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
         DUT name
     title : string
         Plot title
-    non_interactive : boolean
+    non_interactive : bool
         Deactivate user interaction to apply cuts
     '''
     # Global variables needed to manipulate them within a matplotlib QT slot function
@@ -787,7 +787,7 @@ def plot_events(input_tracks_file, event_range=(0, 100), dut=None, n_tracks=None
     Parameters
     ----------
     input_tracks_file : string
-       Filename of the input tracks file.
+        Filename of the input tracks file.
     event_range : iterable
         Tuple of start event number and stop event number (excluding), e.g. (0, 100).
     dut : uint
@@ -1125,7 +1125,7 @@ def plot_charge_distribution(input_track_candidates_file, dim_x, dim_y, pixel_si
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_track_candidates_file)[0] + '_charge_distribution.pdf'
 
-    with PdfPages(output_pdf_file) as output_pdf:
+    with PdfPages(output_pdf_file, keep_empty=False) as output_pdf:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             dimensions = []
             for table_column in in_file_h5.root.TrackCandidates.dtype.names:
@@ -1302,7 +1302,7 @@ def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=Non
     if output_pdf_file is None:
         output_pdf_file = os.path.splitext(input_track_angle_file)[0] + '_track_angle.pdf'
 
-    with PdfPages(output_pdf_file) as output_pdf:
+    with PdfPages(output_pdf_file, keep_empty=False) as output_pdf:
         with tb.open_file(input_track_angle_file, mode="r") as in_file_h5:
             for node in in_file_h5.root:
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
