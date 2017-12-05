@@ -18,15 +18,15 @@ hit_dcr = np.dtype([('event_number', np.int64), ('frame', np.uint8),
 
 
 def combine_hit_files(hit_files, combined_file, event_number_offsets=None,
-                      chunk_size=10000000):
+                      chunk_size=1000000):
     ''' Combine hit files of runs with same parameters to increase statistics.
 
     Parameters
     ----------
     hit_files : iterable
-       Filenames of files containing the hit array.
+        Filenames of files containing the hit array.
     combined_file : string
-       Filename of the output file containing the combined hit array.
+        Filename of the output file containing the combined hit array.
     event_number_offsets : iterable
         Manually set start event number offset for each hit array.
         The event number is increased by the given number.
@@ -74,13 +74,13 @@ def _delete_events(data, fraction):
     return result[:index_result]
 
 
-def reduce_hit_files(hit_files, fraction=10, chunk_size=10000000):
+def reduce_hit_files(hit_files, fraction=10, chunk_size=1000000):
     ''' Delete a fraction of events to allow faster testing of analysis functions.
 
     Parameters
     ----------
     hit_files : iterable
-       Filenames of files containing the hit array.
+        Filenames of files containing the hit array.
     fraction : uint
         The fraction of leftover events,
         e.g.: 10 would correspond to n_events = total_events / fraction.
@@ -106,7 +106,7 @@ def reduce_hit_files(hit_files, fraction=10, chunk_size=10000000):
 
 def select_hits(hit_file, max_hits=None, condition=None, track_quality=None,
                 track_quality_mask=None, output_file=None,
-                chunk_size=10000000):
+                chunk_size=1000000):
     ''' Function to select a fraction of hits fulfilling a given condition.
 
     Needed for analysis speed up, when very large runs are used.

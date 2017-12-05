@@ -96,8 +96,8 @@ class AnalysisPlotter(QtWidgets.QWidget):
         """
         Takes a function and keyword arguments passed to the init of this class and checks whether
         or not the function takes these as arguments. If not, raise TypeError with message naming function and kwarg
-        
-        :param plot_func: function 
+
+        :param plot_func: function
         :param kwargs: dict of keyword arguments
         """
 

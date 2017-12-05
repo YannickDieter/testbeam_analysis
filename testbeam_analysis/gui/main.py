@@ -129,7 +129,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
     def _init_logger(self, init=True):
         """
         Initializes a custom logging handler for analysis and set its
-        visibility to False. The logger can be shown/hidden via the 
+        visibility to False. The logger can be shown/hidden via the
         appearance menu in the GUI or closed button
         """
 
@@ -528,7 +528,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
     def new_analysis(self):
         """
-        Restores the initial state of the AnalysisWindow to re-start analysis 
+        Restores the initial state of the AnalysisWindow to re-start analysis
         """
 
         # Get default settings
@@ -623,7 +623,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             """
             Helper function to run consecutive analysis
             :param tab_list: list or str of tab name whichs analysis step is to be started
-            :param interrupt: bool whether interrupt btn was clicked 
+            :param interrupt: bool whether interrupt btn was clicked
             """
 
             # Redundant call
@@ -720,7 +720,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
     def check_resolution(self):
         """
-        Checks for resolution and gives pop-up warning if too low 
+        Checks for resolution and gives pop-up warning if too low
         """
 
         # Show message box with warning if screen resolution is lower than required

@@ -454,8 +454,8 @@ class SetupTab(QtWidgets.QWidget):
         """
         Removes the dut at index from the QTabWidget and the plotting area. So far only needed
         to remove scattering planes since actual DUTs are not removable.
-        
-        :param index: int of position of tab in QTabWidget 
+
+        :param index: int of position of tab in QTabWidget
         """
 
         # Get dut_name

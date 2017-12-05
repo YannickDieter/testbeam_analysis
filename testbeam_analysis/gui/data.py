@@ -1,5 +1,5 @@
 """
-Implements a DataTab that allows to select and check test beam data for further analysis 
+Implements a DataTab that allows to select and check test beam data for further analysis
 """
 
 import os

@@ -123,7 +123,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
         # Merge result data from arrays into one recarray
         combined = np.column_stack((event_number, x, y, z, charge, n_hits, track_quality, n_tracks, x_err, y_err, z_err))
         return np.core.records.fromarrays(combined.transpose(), dtype=tracklets_data_chunk.dtype)
-    
+
     smc.SMC(table_file_in=input_tracklets_file,
             file_out=output_track_candidates_file,
             func=work,
@@ -523,8 +523,8 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 z_position = geometry_utils.get_line_intersections_with_plane(line_origins=np.column_stack((track_estimates_chunk[:, dut_index, 0],
                                                                                                             track_estimates_chunk[:, dut_index, 1],
                                                                                                             np.ones(track_estimates_chunk[:, dut_index, 0].shape))),
-                                                                              line_directions=np.column_stack((np.zeros((track_estimates_chunk[:, dut_index, 0].shape)), 
-                                                                                                               np.zeros(track_estimates_chunk[:, dut_index, 0].shape), 
+                                                                              line_directions=np.column_stack((np.zeros((track_estimates_chunk[:, dut_index, 0].shape)),
+                                                                                                               np.zeros(track_estimates_chunk[:, dut_index, 0].shape),
                                                                                                                np.ones(track_estimates_chunk[:, dut_index, 0].shape))),
                                                                               position_plane=dut_position,
                                                                               normal_plane=dut_plane_normal)[:, -1]
@@ -609,7 +609,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         return dut_selection, dut_fit_selection, track_quality_mask
 
     pool = Pool()
-    with PdfPages(os.path.splitext(output_tracks_file)[0] + '.pdf') as output_pdf:
+    with PdfPages(os.path.splitext(output_tracks_file)[0] + '.pdf', keep_empty=False) as output_pdf:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             try:  # If file exists already delete it first
                 os.remove(output_tracks_file)

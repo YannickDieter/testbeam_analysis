@@ -17,7 +17,7 @@ from testbeam_analysis.tools import geometry_utils
 from testbeam_analysis.tools import analysis_utils
 
 
-def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel_size, output_residuals_file=None, dut_names=None, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, use_fit_limits=True, plot=True, cluster_size_selection=None, gui=False, chunk_size=1000000):
+def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel_size, output_residuals_file=None, dut_names=None, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, use_fit_limits=True, cluster_size_selection=None, plot=True, gui=False, chunk_size=1000000):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
 
     Parameters
@@ -46,16 +46,16 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
         Number of bins per pixel along the residual axis. Number is a positive integer or None to automatically set the binning.
     npixels_per_bin : int
         Number of pixels per bin along the position axis. Number is a positive integer or None to automatically set the binning.
-    force_prealignment : boolean
+    force_prealignment : bool
         Take the prealignment, although if a coarse alignment is availale.
-    plot : bool
-        If True, create additional output plots.
     cluster_size_selection : uint
         Select which cluster sizes should be included for residual calculation. If None all cluster sizes are taken.
+    plot : bool
+        If True, create additional output plots.
+    gui : bool
+        If True, use GUI for plotting.
     chunk_size : int
         Chunk size of the data when reading from file.
-    gui : bool
-        If True, this function is excecuted from GUI and returns figures
     '''
     logging.info('=== Calculating residuals ===')
 
@@ -702,7 +702,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
     show_inefficient_events : bool
         Whether to log inefficient events
     gui : bool
-        If True, this function is excecuted from GUI and returns figures
+        If True, use GUI for plotting.
     '''
     logging.info('=== Calculating efficiency ===')
 
@@ -938,7 +938,7 @@ def calculate_purity(input_tracks_file, input_alignment_file, bin_size, sensor_s
         The DUTs to calculate purity for. If None all duts are used.
     max_chi2 : int
         Only use track with a chi2 <= max_chi2.
-    force_prealignment : boolean
+    force_prealignment : bool
         Take the prealignment, although if a coarse alignment is availale.
     cut_distance : int
         Hit - track intersection <= cut_distance = pure hit (hit assigned to track).
@@ -958,7 +958,7 @@ def calculate_purity(input_tracks_file, input_alignment_file, bin_size, sensor_s
         output_purity_file = os.path.splitext(input_tracks_file)[0] + '_purity.h5'
 
     if plot is True:
-        output_pdf = PdfPages(os.path.splitext(output_purity_file)[0] + '.pdf')
+        output_pdf = PdfPages(os.path.splitext(output_purity_file)[0] + '.pdf', keep_empty=False)
     else:
         output_pdf = None
 
