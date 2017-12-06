@@ -105,16 +105,18 @@ class SMC(object):
 
         # Get the table node name
         with tb.open_file(table_file_in) as in_file:
+            node = None
             if not table:  # Find the table node
                 for n in in_file.root:
                     if tb.table.Table == type(n):
                         if not table:
-                            node = n
-                        else:  # Multiple tables
-                            raise RuntimeError('No table node defined and '
-                                               'multiple nodes found in file')
+                            if not node:
+                                node = n
+                            else:  # Multiple tables
+                                raise RuntimeError('No table node defined and '
+                                                   'multiple table nodes found in file')
                 self.node_name = node.name
-            elif isinstance(table, Iterable):  # possible names
+            elif type(table) is list or type(table) is tuple:  # possible names
                 self.node_name = None
                 for node_cand in table:
                     try:
