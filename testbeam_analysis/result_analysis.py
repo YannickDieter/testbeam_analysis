@@ -1384,7 +1384,6 @@ def calculate_in_pixel_hit_distribution(input_tracks_file, input_alignment_file,
             projections_cs_2d_hist = np.empty(shape=(4, n_bins[0], n_bins[1]))
 
             for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):  # read track file in chunks
-                print tracks_chunk.dtype
                 # select only valid track intersection
                 tracks_chunk = tracks_chunk[~np.isnan(tracks_chunk[:]['offset_0'])]
 
@@ -1449,6 +1448,7 @@ def calculate_in_pixel_hit_distribution(input_tracks_file, input_alignment_file,
                     cs_edges = np.arange(1.0 - 0.5, 1000 + 0.5, 1)
                     cs_hist, cs_edges = np.histogram(n_hits, bins=cs_edges, density=False)
                     initialize = False
+
                 else:  # if already read first chunk, add histograms up
                     for cs in range(4):
                         projections_x_cs_hist[cs, :] += np.histogram(projections_cs[cs][0], bins=edges_x)[0]
