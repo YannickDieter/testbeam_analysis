@@ -924,43 +924,19 @@ def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title=
     return fit, cov
 
 
-def fit_in_pixel_hit_hist(cs1_hist_projected, cs2_hist_projected, bin_center_x, bin_center_y):
-    # fit distributions with gauss curve
-    fit_cs_1_x_sliced, _ = curve_fit(testbeam_analysis.tools.analysis_utils.gauss_offset,
-                                     bin_center_x,
-                                     cs1_hist_projected[0],
-                                     p0=(np.max(cs1_hist_projected[0]) - np.min(cs1_hist_projected[0]),
-                                         np.median(bin_center_x),
-                                         np.std(np.repeat((bin_center_x).astype(np.int64), (cs1_hist_projected[0]).astype(np.int64))),
-                                         np.min(cs1_hist_projected[0])),
-                                     sigma=np.sqrt(cs1_hist_projected[0]))
-    fit_cs_1_y_sliced, _ = curve_fit(testbeam_analysis.tools.analysis_utils.gauss_offset,
-                                     bin_center_y,
-                                     cs1_hist_projected[1],
-                                     p0=(np.max(cs1_hist_projected[1]) - np.min(cs1_hist_projected[1]),
-                                         np.median(bin_center_y),
-                                         np.std(np.repeat((bin_center_y).astype(np.int64), (cs1_hist_projected[1]).astype(np.int64))),
-                                         np.min(cs1_hist_projected[1])),
-                                     sigma=np.sqrt(cs1_hist_projected[1]))
+def fit_in_pixel_hit_hist(hist, edges):
+    try:
+        fit, _ = curve_fit(testbeam_analysis.tools.analysis_utils.gauss_offset,
+                           edges, hist,
+                           p0=(np.max(hist) - np.min(hist),
+                               np.median(edges),
+                               np.std(np.repeat((edges).astype(np.int64), (hist).astype(np.int64))),
+                               np.min(hist)),
+                           sigma=np.sqrt(hist))
+    except RuntimeError:
+        fit = [np.NaN, np.NaN, np.NaN, np.NaN]
 
-    fit_cs_2_x_sliced, _ = curve_fit(testbeam_analysis.tools.analysis_utils.gauss_offset,
-                                     bin_center_x,
-                                     cs2_hist_projected[0],
-                                     p0=(np.max(cs2_hist_projected[0]) - np.min(cs2_hist_projected[0]),
-                                         np.median(bin_center_x),
-                                         np.std(np.repeat((bin_center_x).astype(np.int64), (cs2_hist_projected[0]).astype(np.int64))),
-                                         np.min(cs2_hist_projected[0])),
-                                     sigma=np.sqrt(cs2_hist_projected[0]))
-    fit_cs_2_y_sliced, _ = curve_fit(testbeam_analysis.tools.analysis_utils.gauss_offset,
-                                     bin_center_y,
-                                     cs2_hist_projected[1],
-                                     p0=(np.max(cs2_hist_projected[1]) - np.min(cs2_hist_projected[1]),
-                                         np.median(bin_center_y),
-                                         np.std(np.repeat((bin_center_y).astype(np.int64), (cs2_hist_projected[1]).astype(np.int64))),
-                                         np.min(cs2_hist_projected[1])),
-                                     sigma=np.sqrt(cs2_hist_projected[1]))
-
-    return fit_cs_1_x_sliced, fit_cs_1_y_sliced, fit_cs_2_x_sliced, fit_cs_2_y_sliced
+    return fit
 
 
 def hough_transform(img, theta_res=1.0, rho_res=1.0, return_edges=False):
