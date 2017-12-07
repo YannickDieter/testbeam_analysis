@@ -103,20 +103,18 @@ class SMC(object):
             raise NotImplementedError('Data alignment is only supported '
                                       'on event_number')
 
+
+
         # Get the table node name
         with tb.open_file(table_file_in) as in_file:
-            node = None
             if not table:  # Find the table node
-                for n in in_file.root:
-                    if tb.table.Table == type(n):
-                        if not table:
-                            if not node:
-                                node = n
-                            else:  # Multiple tables
-                                raise RuntimeError('No table node defined and '
-                                                   'multiple table nodes found in file')
-                self.node_name = node.name
-            elif type(table) is list or type(table) is tuple:  # possible names
+                tables = in_file.list_nodes(classname='table') # get all nodes of type 'table'
+                if  len(tables) == 1: # if there is only one table, take this one
+                    self.node_name = tables[0]
+                else:  #  Multiple tables
+                    raise RuntimeError('No table node defined and '
+                                       'multiple table nodes found in file')
+            elif isinstance(table,(list,tuple,set)):  # possible names
                 self.node_name = None
                 for node_cand in table:
                     try:
@@ -129,6 +127,7 @@ class SMC(object):
                         'No table nodes with names %s found', str(table))
             else:  # string
                 self.node_name = table
+
 
             node = in_file.get_node(in_file.root, self.node_name)
 
