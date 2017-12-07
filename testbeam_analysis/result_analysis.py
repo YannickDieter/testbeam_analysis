@@ -1333,10 +1333,11 @@ def calculate_in_pixel_hit_distribution(input_tracks_file, input_alignment_file,
     use_prealignment = True if force_prealignment else False
 
     def calculate_effective_cs1_pitch(cs_hist, pitch):
-        '''Calculates the effectice CS-1 pitch p_eff using the CS distribution: p_eff = sqrt(pitch^2 * CS1_percentage)
+        '''Calculates the effectice CS-1 pitch p_eff using the CS distribution: p_eff = sqrt(pitch^2 * N_CS1 / N_tot)
+        Where N_CS1 is the number of clusters with CS1 and N_tot the total number of clusters.
         '''
         perc_cluster_size_1 = 100. * ((cs_hist[0].astype(np.float) / np.sum(cs_hist).astype(np.float)))
-        return np.sqrt(pitch * pitch * perc_cluster_size_1 / 100.)
+        return pitch[0] * np.sqrt(perc_cluster_size_1 / 100.), pitch[1] * np.sqrt(perc_cluster_size_1 / 100.)
 
     def normalize_distributions(hists, fit_results):
         '''Normalize CS distributions in order to compare them.
@@ -1458,7 +1459,7 @@ def calculate_in_pixel_hit_distribution(input_tracks_file, input_alignment_file,
                     cs_hist += np.histogram(n_hits, bins=cs_edges, density=False)[0]
 
             # calculate effective pitch from cluster size ratio
-            effective_pitch = calculate_effective_cs1_pitch(cs_hist=cs_hist, pitch=actual_pixel_size[0])
+            effective_pitch = calculate_effective_cs1_pitch(cs_hist=cs_hist, pitch=[actual_pixel_size[0], actual_pixel_size[1]])
             effective_pitches.append(effective_pitch)
 
             if plot:

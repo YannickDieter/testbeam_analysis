@@ -1508,8 +1508,8 @@ def plot_in_pixel_hit_hist_with_eff_pitch(x_intersections_hist_cs_1, x_intersect
     def difference_y_sliced(x):
         return testbeam_analysis.tools.analysis_utils.gauss_offset(x, *fit_cs_1_y_sliced) - fit_cs_1_y_sliced[3] + fit_cs_2_y_sliced[0] + fit_cs_2_y_sliced[3] - testbeam_analysis.tools.analysis_utils.gauss_offset(x, *fit_cs_2_y_sliced)
 
-    roots_x_sliced = fsolve(difference_x_sliced, [(pixel_pitch[0] - effective_pitch) / 2.0, pixel_pitch[0] - ((pixel_pitch[0] - effective_pitch) / 2.0)])
-    roots_y_sliced = fsolve(difference_y_sliced, [(pixel_pitch[1] - effective_pitch) / 2.0, pixel_pitch[1] - ((pixel_pitch[1] - effective_pitch) / 2.0)])
+    roots_x_sliced = fsolve(difference_x_sliced, [(pixel_pitch[0] - effective_pitch[0]) / 2.0, pixel_pitch[0] - ((pixel_pitch[0] - effective_pitch[0]) / 2.0)])
+    roots_y_sliced = fsolve(difference_y_sliced, [(pixel_pitch[1] - effective_pitch[1]) / 2.0, pixel_pitch[1] - ((pixel_pitch[1] - effective_pitch[1]) / 2.0)])
 
     # draw intersections of CS 1 and CS 2 distribution
     for i in range(len(roots_x_sliced)):
@@ -1520,8 +1520,8 @@ def plot_in_pixel_hit_hist_with_eff_pitch(x_intersections_hist_cs_1, x_intersect
                    [roots_y_sliced[0], roots_y_sliced[1], roots_y_sliced[1], roots_y_sliced[0], roots_y_sliced[0]],
                    '-', color='black', label='Effective CS-1-Pitch from Transition of Cluster Size Hit Distributions')
     # draw effective cluster size area from cluster size ratio
-    axHeatmap.plot([(pixel_pitch[0] - effective_pitch) / 2., (pixel_pitch[0] - effective_pitch) / 2., pixel_pitch[0] - ((pixel_pitch[0] - effective_pitch) / 2.), pixel_pitch[0] - ((pixel_pitch[0] - effective_pitch) / 2.), (pixel_pitch[0] - effective_pitch) / 2.],
-                   [(pixel_pitch[1] - effective_pitch) / 2., pixel_pitch[1] - ((pixel_pitch[1] - effective_pitch) / 2.), pixel_pitch[1] - ((pixel_pitch[1] - effective_pitch) / 2.), (pixel_pitch[1] - effective_pitch) / 2., (pixel_pitch[1] - effective_pitch) / 2],
+    axHeatmap.plot([(pixel_pitch[0] - effective_pitch[0]) / 2., (pixel_pitch[0] - effective_pitch[0]) / 2., pixel_pitch[0] - ((pixel_pitch[0] - effective_pitch[0]) / 2.), pixel_pitch[0] - ((pixel_pitch[0] - effective_pitch[0]) / 2.), (pixel_pitch[0] - effective_pitch[0]) / 2.],
+                   [(pixel_pitch[1] - effective_pitch[1]) / 2., pixel_pitch[1] - ((pixel_pitch[1] - effective_pitch[1]) / 2.), pixel_pitch[1] - ((pixel_pitch[1] - effective_pitch[1]) / 2.), (pixel_pitch[1] - effective_pitch[1]) / 2., (pixel_pitch[1] - effective_pitch[1]) / 2],
                    '--', color='black', label='Effective CS-1-Pitch from Cluster Size Ratio of Cluster Size Distribution')
 
     # colorbar
