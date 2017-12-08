@@ -108,9 +108,9 @@ class SMC(object):
         # Get the table node name
         with tb.open_file(table_file_in) as in_file:
             if not table:  # Find the table node
-                tables = in_file.list_nodes(classname='table') # get all nodes of type 'table'
+                tables = in_file.list_nodes('/',classname='Table') # get all nodes of type 'table'
                 if  len(tables) == 1: # if there is only one table, take this one
-                    self.node_name = tables[0]
+                    self.node_name = tables[0].name
                 else:  #  Multiple tables
                     raise RuntimeError('No table node defined and '
                                        'multiple table nodes found in file')
@@ -127,7 +127,6 @@ class SMC(object):
                         'No table nodes with names %s found', str(table))
             else:  # string
                 self.node_name = table
-
 
             node = in_file.get_node(in_file.root, self.node_name)
 
