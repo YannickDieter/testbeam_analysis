@@ -276,13 +276,7 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
     clz.set_end_of_cluster_function(calc_cluster_dimensions)
 
     # Run clusterizer on hit table in parallel on all cores
-    def cluster_func(hits, clz, calc_cluster_dimensions):
-        # Add cluster size calculation
-        # EDGE CASE: the reference of an in time jitted function
-        # does not seem to be pickled correctly when transfered
-        # to the worker thread. Thus it has to be set here
-        # manually. This might be solved in the future
-        clz.set_end_of_cluster_function(calc_cluster_dimensions)
+    def cluster_func(hits, clz, noisy_pixels, disabled_pixels):
         _, cl = clz.cluster_hits(hits,
                                  noisy_pixels=noisy_pixels,
                                  disabled_pixels=disabled_pixels)
@@ -292,7 +286,8 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
             file_out=output_cluster_file,
             func=cluster_func,
             func_kwargs={'clz': clz,
-                         'calc_cluster_dimensions': calc_cluster_dimensions},
+                         'noisy_pixels': noisy_pixels,
+                         'disabled_pixels': disabled_pixels},
             node_desc={'name': 'Cluster'},
             align_at='event_number',
             chunk_size=chunk_size)
